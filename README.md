@@ -1,12 +1,12 @@
 # Udemy Business Top Courses Scraper (Resillion)
 
-Production-ready Node.js + TypeScript CLI that scrapes the Resillion Udemy Business catalog and exports top 3 eligible courses per keyword to CSV.
+Production-ready Node.js + TypeScript CLI that scrapes the Resillion Udemy Business catalog and exports top courses per keyword to CSV.
 
 ## Overview
-- Reads source keywords from `./keywords-list.csv` and auto-generates normalized keywords at `./artifacts/keywords.normalized.csv`.
+- Reads keyword mappings from `./input/keywords.csv`.
 - Reuses a persisted Playwright browser profile for SSO-authenticated sessions.
-- Uses deterministic URL-driven navigation (`page.goto`) for search and course pages (no UI clicks).
-- Enforces same-tab behavior by closing unexpected tabs/popups.
+- Uses Playwright `chromium` with `channel=chrome` by default to match a real Chrome runtime used by normal browsing.
+- Scrapes search results with API sniffing, resilient response waits, and DOM fallback extraction.
 - Output CSV: `./artifacts/udemy/top_courses.csv`
 
 ## Setup
@@ -15,88 +15,72 @@ Production-ready Node.js + TypeScript CLI that scrapes the Resillion Udemy Busin
    ```bash
    npm install
    ```
-3. Ensure source keyword file exists:
-   - `./keywords-list.csv`
-   - Headers: `Track,Level,Core Modules,AI Modules,Softskills`
-   - `Track` can be blank to carry forward the previous row
-   - Module columns contain semicolon-separated keywords
+3. Ensure input file exists:
+   - `./input/keywords.csv`
+   - Headers: `track,level,moduleType,keyword`
 
-
-## Keyword normalization
-- Normalized keyword file: `./artifacts/keywords.normalized.csv`
-- Normalized schema: `track,level,moduleType,keyword`
-- Module type values: `core`, `ai`, `softskill`
-- During `npm run scrape`, normalization runs automatically when needed:
-  - normalized file missing, or
-  - source keyword file is newer than normalized file
-
-Generate normalized keywords directly:
-```bash
-npm run normalize:keywords
-```
-
-Optional file overrides:
-- `--keywordsFile=<path>` (default: `./keywords-list.csv`)
-- `--normalizedKeywordsFile=<path>` (default: `./artifacts/keywords.normalized.csv`)
-
-## Authentication workflow (persistent profileDir + manual SSO)
-The scraper launches a persistent browser context using `--profileDir`.
-
-On first run, use headed mode and complete SSO manually once:
+## First run (manual SSO, headed)
+Use headed mode and complete SSO in the opened browser profile:
 ```bash
 npm run scrape -- --headless=false --profileDir=./artifacts/profile --browserChannel=chrome
 ```
-If not authenticated, the CLI pauses and asks you to press ENTER after login succeeds. Cookies/session are then reused in later runs from the same `profileDir`.
+If not authenticated, the CLI pauses and asks you to press ENTER after login succeeds.
 
-## URL-driven search parameters
-Supported query params on `/organization/search/`:
-- `src=ukw`
-- `q=<keyword>`
-- `ratings=<number>`
-- `lang=<code>`
-- `instructional_level=<all|beginner|intermediate|expert>` (repeatable)
-- `sort=<highest-rated|most-reviewed|relevance|newest>`
-
-Examples:
-- `https://resillion.udemy.com/organization/search/?src=ukw&q=testing&ratings=4.5&lang=en`
-- `https://resillion.udemy.com/organization/search/?src=ukw&q=testing&ratings=4.5&lang=en&instructional_level=beginner&instructional_level=intermediate&instructional_level=expert`
-- `https://resillion.udemy.com/organization/search/?src=ukw&q=informatics&sort=most-reviewed`
-
-## Default pre-filters and eligibility rules
-Default URL pre-filters:
-- `ratings=4.5`
-- `lang=en`
-- `sort=most-reviewed`
-
-Final eligibility (from detail extraction):
-- rating `>= 4.5`
-- ratingCount `>= 1500`
+## Recommended run flags
+```bash
+npm run scrape -- --headless=true --browserChannel=chrome --concurrency=1 --throttleMs=900 --maxPages=8
+```
+Recommended defaults for Udemy Business stability:
+- `--browserChannel=chrome`
+- `--concurrency=1`
+- `--throttleMs` >= `700`
+- conservative `--maxPages`
 
 ## CLI flags
 - `--headless` (default: `false`)
 - `--debug` (default: `false`)
 - `--browserChannel` (default: `chrome`, allowed: `chrome|msedge|chromium`)
-- `--maxCoursesPerKeyword` (default: `200`, capped at 200)
+- `--maxCoursesPerKeyword` (default: `200`)
 - `--maxPages` (default: `15`)
-- `--throttleMs` (accepted for backward compatibility)
-- `--concurrency` (accepted for backward compatibility)
+- `--throttleMs` (default: `300`, plus built-in jitter 400-1200ms)
+- `--concurrency` (default: `1`)
 - `--profileDir` (default: `./artifacts/profile`)
-- `--keywordsFile` (default: `./keywords-list.csv`)
-- `--normalizedKeywordsFile` (default: `./artifacts/keywords.normalized.csv`)
 
 Use `--help` to print CLI help at runtime.
+
+## Search resilience behavior
+- Detects the UI error state `search is currently unavailable`.
+- Retries page reload up to 3 times using exponential backoff + jitter.
+- If still unavailable, skips the keyword gracefully and records `status=failed` + `failureReason` in CSV output.
+- Stops pagination when unique result count does not increase.
+- Uses network endpoint sniffing to avoid non-result endpoints (for example, `learning_path_folder` tags).
+- Falls back to DOM extraction if API capture fails.
 
 ## Output CSV format
 `./artifacts/udemy/top_courses.csv`
 
 Columns:
-- `keyword,courseTitle,courseUrl,rating,ratingCount`
+- `track,level,moduleType,keyword,courseId,url,title,language,durationMinutes,udemyLevel,category,rating,ratingCount,score,status,failureReason`
 
-## Diagnostics and failure artifacts
-On navigation/extraction failures, artifacts are saved under `artifacts/nav_failures/`:
-- screenshot (`.png`)
-- page HTML dump (`.html`)
-- context text (`.txt`) with URL, keyword, and error
+## Troubleshooting
+- **“Sorry, search is currently unavailable” appears**:
+  - Likely rate limiting or anti-bot fingerprinting.
+  - Run slower (`--concurrency=1`, higher `--throttleMs`, lower `--maxPages`).
+  - Prefer `--browserChannel=chrome`.
+  - Retry with a fresh profile directory and re-run SSO.
+- **Chrome channel is missing**:
+  - Install Chrome (or use `--browserChannel=msedge`).
+  - Scraper logs a warning and falls back to Playwright Chromium automatically.
+- **Login keeps failing in headless mode**:
+  - run with `--headless=false` and complete SSO manually once.
+- **Empty results**:
+  - verify keyword relevance, account access, and that filters are not excluding all courses.
+
+## Smoke check
+Run lifecycle smoke check:
+```bash
+npm run smoke
+```
 
 ## Compliance note
 Use responsibly. Respect Udemy Business terms of use, organizational policies, and platform rate limits.
