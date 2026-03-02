@@ -49,7 +49,7 @@ Default URL pre-filters:
 - `sort=most-reviewed`
 
 Final eligibility (from detail extraction):
-- rating `>= 4.4`
+- rating `>= 4.5`
 - ratingCount `>= 1500`
 
 ## CLI flags
@@ -68,7 +68,7 @@ Use `--help` to print CLI help at runtime.
 `./artifacts/udemy/top_courses.csv`
 
 Columns:
-- `keyword,courseTitle,courseUrl,rating,ratingCount,courseId`
+- `keyword,courseTitle,courseUrl,rating,ratingCount`
 
 ## Diagnostics and failure artifacts
 On navigation/extraction failures, artifacts are saved under `artifacts/nav_failures/`:

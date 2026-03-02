@@ -105,7 +105,7 @@ export function getAppConfig(): AppConfig {
     inputCsvPath: './input/keywords.csv',
     outputCsvPath: './artifacts/udemy/top_courses.csv',
     englishLocales: new Set(DEFAULT_ENGLISH_LOCALES),
-    minRating: 4.4,
+    minRating: 4.5,
     minRatingCount: 1500,
   };
 }
