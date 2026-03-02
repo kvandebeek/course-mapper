@@ -105,9 +105,46 @@ export async function collectAndRankTopCourses(
 
   for (const courseUrl of urls) {
     try {
+      logger.debug('Detail extraction entrypoint', {
+        keyword,
+        courseUrl,
+        extractor: 'src/udemy/extractCourseDetail.ts:extractCourseDetail'
+      });
       await gotoWithRetries(page, courseUrl);
-      const detail = await extractCourseDetail(page, keyword, courseUrl);
+      logger.info('Opening detail page', { keyword, courseUrl, currentUrl: page.url() });
+
+      const extraction = await extractCourseDetail(page, keyword, courseUrl);
+      if (!extraction.ok) {
+        rejectionCounts.set('detail extraction failed', (rejectionCounts.get('detail extraction failed') ?? 0) + 1);
+        logger.warn('Detail extraction failed', {
+          keyword,
+          courseUrl,
+          reason: extraction.reason,
+          diagnosticsUrl: extraction.diagnostics.url,
+          diagnosticsTitle: extraction.diagnostics.title,
+          primaryContainerSnippet: extraction.diagnostics.primaryContainerSnippet
+        });
+        continue;
+      }
+
+      const detail = extraction.data;
+      logger.info('Extracting detail fields completed', {
+        keyword,
+        courseUrl,
+        courseId: detail.courseId,
+        title: detail.title
+      });
       const eligibility = isCourseEligible(detail, now);
+
+      logger.info('Computed filters', {
+        keyword,
+        courseUrl,
+        eligible: eligibility.ok,
+        reason: eligibility.reason,
+        rating: detail.rating,
+        ratingCount: detail.ratingCount,
+        lastUpdateDate: detail.lastUpdateDate
+      });
 
       logger.info('Detail extracted', {
         keyword,
@@ -122,8 +159,10 @@ export async function collectAndRankTopCourses(
       });
 
       if (eligibility.ok) {
+        logger.info('Course accepted', { keyword, courseUrl, courseId: detail.courseId, title: detail.title });
         details.push(detail);
       } else {
+        logger.info('Course rejected', { keyword, courseUrl, reason: eligibility.reason });
         rejectionCounts.set(eligibility.reason, (rejectionCounts.get(eligibility.reason) ?? 0) + 1);
       }
     } catch (error) {
