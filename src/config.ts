@@ -50,7 +50,7 @@ export function getCliOptions(argv: string[]): CliOptions {
     browserChannel: 'chrome',
     maxCoursesPerKeyword: 200,
     maxPages: 15,
-    throttleMs: 3200,
+    throttleMs: 500,
     concurrency: 1,
     profileDir: './artifacts/profile'
   };
@@ -135,8 +135,8 @@ export function getAppConfig(): AppConfig {
     normalizedKeywordsCsvPath: './artifacts/keywords.normalized.csv',
     outputCsvPath: './artifacts/udemy/top_courses.csv',
     englishLocales: new Set(DEFAULT_ENGLISH_LOCALES),
-    minRating: 4.5,
-    minRatingCount: 1500,
+    minRating: 4.6,
+    minRatingCount: 5000,
   };
 }
 

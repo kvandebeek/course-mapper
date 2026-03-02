@@ -7,9 +7,9 @@
 
 import { Logger } from '../logger.js';
 
-const DEFAULT_JITTER_RATIO = 0.25;
-const DEFAULT_BACKOFF_BASE_MS = 10_000;
-const DEFAULT_BACKOFF_MAX_MS = 90_000;
+const DEFAULT_JITTER_RATIO = 0.20;
+const DEFAULT_BACKOFF_BASE_MS = 1_000;
+const DEFAULT_BACKOFF_MAX_MS = 15_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 /**

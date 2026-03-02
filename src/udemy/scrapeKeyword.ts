@@ -18,16 +18,16 @@ import {
 } from './navigation.js';
 import { sleepMs, throttled } from '../utils/throttle.js';
 
-const RESULT_WAIT_TIMEOUT_MS = 20_000;
-const LOAD_MORE_WAIT_TIMEOUT_MS = 8_000;
+const RESULT_WAIT_TIMEOUT_MS = 25_000;
+const LOAD_MORE_WAIT_TIMEOUT_MS = 10_000;
 const DEBUG_HREF_LIMIT = 30;
 
 export type CourseUrl = string;
 
 export const DEFAULT_FILTERS: SearchFilters = {
-  minRating: 4.5,
+  minRating: 4.6,
   lang: 'en',
-  sort: 'most-reviewed'
+  sort: 'relevance'
 };
 
 /**
