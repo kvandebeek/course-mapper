@@ -1,3 +1,10 @@
+/**
+ * src/logger.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 export interface Logger {
   info(message: string, data?: Record<string, unknown>): void;
   warn(message: string, data?: Record<string, unknown>): void;
@@ -5,7 +12,13 @@ export interface Logger {
   debug(message: string, data?: Record<string, unknown>): void;
 }
 
+/**
+ * createLogger: public helper used by other modules.
+ */
 export function createLogger(debugEnabled: boolean): Logger {
+/**
+ * log: internal utility for this module.
+ */
   function log(level: string, message: string, data?: Record<string, unknown>): void {
     const timestamp = new Date().toISOString();
     const payload = data ? ` ${JSON.stringify(data)}` : '';

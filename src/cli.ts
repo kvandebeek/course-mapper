@@ -1,3 +1,10 @@
+/**
+ * src/cli.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { getAppConfig, getCliOptions, resolvePath } from './config.js';
 import { createLogger } from './logger.js';
 import { initAuthenticatedSession } from './auth.js';
@@ -9,6 +16,9 @@ import { enforceSameTabNavigation } from './udemy/navigation.js';
 import { ensureNormalizedKeywords } from './keywords/ensureNormalizedKeywords.js';
 import { loadNormalizedKeywords } from './keywords/loadNormalizedKeywords.js';
 
+/**
+ * printHelp: internal utility for this module.
+ */
 function printHelp(): void {
   console.log(`Udemy Business scraper options:
   --headless=true|false
@@ -23,6 +33,9 @@ function printHelp(): void {
   --normalizedKeywordsFile=<path> (default: ./artifacts/keywords.normalized.csv)`);
 }
 
+/**
+ * main: internal utility for this module.
+ */
 async function main(): Promise<void> {
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     printHelp();

@@ -1,3 +1,10 @@
+/**
+ * src/keywords/ensureNormalizedKeywords.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { stat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { normalizeKeywordsFile } from './normalizeKeywords.js';
@@ -7,6 +14,9 @@ interface EnsureNormalizedKeywordsParams {
   readonly normalizedFile: string;
 }
 
+/**
+ * ensureNormalizedKeywords: public helper used by other modules.
+ */
 export async function ensureNormalizedKeywords(params: EnsureNormalizedKeywordsParams): Promise<{ readonly regenerated: boolean; readonly normalizedFile: string; readonly generatedCount: number; }> {
   const sourcePath = path.resolve(params.sourceFile);
   const normalizedPath = path.resolve(params.normalizedFile);

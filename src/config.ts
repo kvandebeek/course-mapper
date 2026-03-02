@@ -1,9 +1,19 @@
+/**
+ * src/config.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import * as path from 'node:path';
 import { BrowserChannel, CliOptions, AppConfig } from './types.js';
 
 const DEFAULT_ENGLISH_LOCALES = ['en', 'en_US', 'en_GB'];
 const ALLOWED_BROWSER_CHANNELS: readonly BrowserChannel[] = ['chrome', 'msedge', 'chromium'];
 
+/**
+ * parseBoolean: internal utility for this module.
+ */
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) {
     return true;
@@ -17,6 +27,9 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return fallback;
 }
 
+/**
+ * parseBrowserChannel: internal utility for this module.
+ */
 function parseBrowserChannel(value: string | undefined): BrowserChannel {
   if (!value) {
     return 'chrome';
@@ -27,6 +40,9 @@ function parseBrowserChannel(value: string | undefined): BrowserChannel {
   throw new Error(`Invalid --browserChannel value: ${value}. Allowed values: ${ALLOWED_BROWSER_CHANNELS.join(', ')}`);
 }
 
+/**
+ * getCliOptions: public helper used by other modules.
+ */
 export function getCliOptions(argv: string[]): CliOptions {
   const options: CliOptions = {
     headless: false,
@@ -108,6 +124,9 @@ export function getCliOptions(argv: string[]): CliOptions {
   return options;
 }
 
+/**
+ * getAppConfig: public helper used by other modules.
+ */
 export function getAppConfig(): AppConfig {
   return {
     baseUrl: 'https://resillion.udemy.com',
@@ -121,6 +140,9 @@ export function getAppConfig(): AppConfig {
   };
 }
 
+/**
+ * resolvePath: public helper used by other modules.
+ */
 export function resolvePath(relativePath: string): string {
   return path.resolve(process.cwd(), relativePath);
 }

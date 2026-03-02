@@ -1,3 +1,10 @@
+/**
+ * src/udemy/scrapeKeyword.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Page } from 'playwright';
@@ -23,6 +30,9 @@ export const DEFAULT_FILTERS: SearchFilters = {
   sort: 'most-reviewed'
 };
 
+/**
+ * collectCourseUrlsForKeyword: public helper used by other modules.
+ */
 export async function collectCourseUrlsForKeyword(
   page: Page,
   keyword: string,
@@ -85,6 +95,9 @@ export async function collectCourseUrlsForKeyword(
   return [...unique].slice(0, opts.maxCourses);
 }
 
+/**
+ * collectAndRankTopCourses: public helper used by other modules.
+ */
 export async function collectAndRankTopCourses(
   page: Page,
   keyword: string,
@@ -198,6 +211,9 @@ export type Eligibility = Readonly<{
   reason: FailureReason | null;
 }>;
 
+/**
+ * computeEligibility: public helper used by other modules.
+ */
 export function computeEligibility(input: Readonly<{ rating: number | null; ratingCount: number | null }>): Eligibility {
   const minRating = 4.5;
   const minRatingCount = 1500;
@@ -216,6 +232,9 @@ export function computeEligibility(input: Readonly<{ rating: number | null; rati
   return { eligible: true, reason: null };
 }
 
+/**
+ * rankCourses: internal utility for this module.
+ */
 function rankCourses(courses: readonly CourseDetail[]): CourseDetail[] {
   return [...courses].sort((a, b) => {
     const ratingCmp = compareNumberDesc(a.rating, b.rating);
@@ -227,6 +246,9 @@ function rankCourses(courses: readonly CourseDetail[]): CourseDetail[] {
   });
 }
 
+/**
+ * compareNumberDesc: internal utility for this module.
+ */
 function compareNumberDesc(a: number | null, b: number | null): number {
   if (a === null && b === null) {
     return 0;
@@ -240,6 +262,9 @@ function compareNumberDesc(a: number | null, b: number | null): number {
   return b - a;
 }
 
+/**
+ * waitForSearchResultsUi: internal utility for this module.
+ */
 async function waitForSearchResultsUi(page: Page, throttleMs: number, logger: Logger): Promise<void> {
   const preferred = page.locator('[data-purpose*="search-course-card" i] a[href], [data-purpose="search-course-card-title"]');
   const fallback = page.locator('a[href*="/course/"]');
@@ -259,6 +284,9 @@ async function waitForSearchResultsUi(page: Page, throttleMs: number, logger: Lo
   await fallback.first().waitFor({ state: 'visible', timeout: 2_000 });
 }
 
+/**
+ * extractRenderedHrefs: internal utility for this module.
+ */
 async function extractRenderedHrefs(page: Page): Promise<readonly string[]> {
   return page.locator('a[href]').evaluateAll((anchors) => {
     const hrefs: string[] = [];
@@ -272,6 +300,9 @@ async function extractRenderedHrefs(page: Page): Promise<readonly string[]> {
   });
 }
 
+/**
+ * canonicalizeUrl: public helper used by other modules.
+ */
 export function canonicalizeUrl(rawHref: string, baseUrl: string): string | null {
   if (!rawHref.includes('/course/')) {
     return null;
@@ -291,6 +322,9 @@ export function canonicalizeUrl(rawHref: string, baseUrl: string): string | null
   }
 }
 
+/**
+ * collectSearchIteration: internal utility for this module.
+ */
 async function collectSearchIteration(
   page: Page,
   keyword: string,
@@ -347,6 +381,9 @@ interface HrefDebugDump {
   readonly courseLikeHrefs: readonly string[];
 }
 
+/**
+ * tryLoadMoreResults: internal utility for this module.
+ */
 async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number, logger: Logger, throttleMs: number): Promise<boolean> {
   const loadMoreCandidates = [
     page.getByRole('button', { name: /load more|show more/i }),
@@ -380,6 +417,9 @@ async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number
   }
 }
 
+/**
+ * waitForCourseAnchorGrowth: internal utility for this module.
+ */
 async function waitForCourseAnchorGrowth(page: Page, previousCount: number, throttleMs: number, logger: Logger): Promise<boolean> {
   try {
     await throttled(() => page.waitForFunction(
@@ -393,6 +433,9 @@ async function waitForCourseAnchorGrowth(page: Page, previousCount: number, thro
   }
 }
 
+/**
+ * dumpEmptySearchHtml: internal utility for this module.
+ */
 async function dumpEmptySearchHtml(
   keyword: string,
   page: Page,

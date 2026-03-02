@@ -1,3 +1,10 @@
+/**
+ * src/types.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 export interface CliOptions {
   headless: boolean;
   debug: boolean;

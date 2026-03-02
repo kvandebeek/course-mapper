@@ -1,3 +1,10 @@
+/**
+ * src/udemy/parseSearchResults.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { UDEMY_ORIGIN } from './navigation.js';
 
 export interface SearchParseResult {
@@ -11,6 +18,9 @@ export interface SearchParseResult {
 const ANCHOR_HREF_RE = /<a\b[^>]*\bhref\s*=\s*(['"])(.*?)\1/gi;
 const COURSE_ROOT_RE = /^\/course\/([^/?#]+)\/?$/;
 
+/**
+ * extractCourseDetailUrlsFromSearchHtml: public helper used by other modules.
+ */
 export function extractCourseDetailUrlsFromSearchHtml(html: string): SearchParseResult {
   const urls: string[] = [];
   const seen = new Set<string>();
@@ -47,6 +57,9 @@ export function extractCourseDetailUrlsFromSearchHtml(html: string): SearchParse
   };
 }
 
+/**
+ * normalizeCoursePath: internal utility for this module.
+ */
 function normalizeCoursePath(href: string): string | null {
   let parsed: URL;
   try {

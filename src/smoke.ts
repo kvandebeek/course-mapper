@@ -1,7 +1,17 @@
+/**
+ * src/smoke.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { createLogger } from './logger.js';
 import { createSessionManager } from './runtime/sessionManager.js';
 import { extractCourseDetail } from './udemy/extractCourseDetail.js';
 
+/**
+ * main: internal utility for this module.
+ */
 async function main(): Promise<void> {
   const logger = createLogger(true);
   const profileDir = process.env.SMOKE_PROFILE_DIR ?? './artifacts/profile-smoke';

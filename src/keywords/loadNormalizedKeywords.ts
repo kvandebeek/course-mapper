@@ -1,3 +1,10 @@
+/**
+ * src/keywords/loadNormalizedKeywords.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { parse as parseCsv } from 'csv-parse/sync';
@@ -10,10 +17,16 @@ interface RawNormalizedRow {
   readonly keyword?: string;
 }
 
+/**
+ * isModuleType: internal utility for this module.
+ */
 function isModuleType(value: string): value is ModuleType {
   return value === 'core' || value === 'ai' || value === 'softskills';
 }
 
+/**
+ * loadNormalizedKeywords: public helper used by other modules.
+ */
 export async function loadNormalizedKeywords(normalizedFile: string): Promise<readonly NormalizedKeywordRow[]> {
   const normalizedPath = path.resolve(normalizedFile);
   let content = '';

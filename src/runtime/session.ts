@@ -1,3 +1,10 @@
+/**
+ * src/runtime/session.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { Browser, BrowserContext, Page } from 'playwright';
 import { Logger } from '../logger.js';
 
@@ -9,6 +16,9 @@ export type RuntimeSession = {
   close(): Promise<void>;
 };
 
+/**
+ * createRuntimeSession: public helper used by other modules.
+ */
 export async function createRuntimeSession(context: BrowserContext, logger?: Logger): Promise<RuntimeSession> {
   let contextClosed = false;
   let browserDisconnected = false;
@@ -27,6 +37,9 @@ export async function createRuntimeSession(context: BrowserContext, logger?: Log
     });
   }
 
+/**
+ * isClosed: internal utility for this module.
+ */
   function isClosed(): boolean {
     if (contextClosed || browserDisconnected) {
       return true;
@@ -39,6 +52,9 @@ export async function createRuntimeSession(context: BrowserContext, logger?: Log
     return !browser.isConnected();
   }
 
+/**
+ * ensurePage: internal utility for this module.
+ */
   async function ensurePage(): Promise<Page> {
     if (isClosed()) {
       throw new Error('Runtime session is closed');
@@ -61,6 +77,9 @@ export async function createRuntimeSession(context: BrowserContext, logger?: Log
     return currentPage;
   }
 
+/**
+ * close: internal utility for this module.
+ */
   async function close(): Promise<void> {
     if (isClosed()) {
       return;
@@ -88,6 +107,9 @@ export async function createRuntimeSession(context: BrowserContext, logger?: Log
   };
 }
 
+/**
+ * applyPageTimeouts: internal utility for this module.
+ */
 function applyPageTimeouts(page: Page): void {
   page.setDefaultNavigationTimeout(60000);
   page.setDefaultTimeout(60000);

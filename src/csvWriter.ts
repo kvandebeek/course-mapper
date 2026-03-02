@@ -1,3 +1,10 @@
+/**
+ * src/csvWriter.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { mkdir, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { stringify } from 'csv-stringify/sync';
@@ -11,6 +18,9 @@ const CSV_HEADERS: readonly string[] = [
   'ratingCount'
 ];
 
+/**
+ * writeOutputCsv: public helper used by other modules.
+ */
 export async function writeOutputCsv(outputPath: string, rows: readonly ExportRow[]): Promise<void> {
   await mkdir(path.dirname(outputPath), { recursive: true });
 

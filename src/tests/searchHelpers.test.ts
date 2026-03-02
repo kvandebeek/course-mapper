@@ -1,3 +1,10 @@
+/**
+ * src/tests/searchHelpers.test.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';

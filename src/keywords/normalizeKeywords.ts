@@ -1,3 +1,10 @@
+/**
+ * src/keywords/normalizeKeywords.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { parse as parseCsv } from 'csv-parse/sync';
@@ -31,6 +38,9 @@ const MODULE_FIELDS: readonly { readonly field: keyof SourceKeywordCsvRow; reado
   { field: 'Softskills', moduleType: 'softskills' }
 ];
 
+/**
+ * hasExpectedHeaders: internal utility for this module.
+ */
 function hasExpectedHeaders(rows: readonly SourceKeywordCsvRow[]): boolean {
   if (rows.length === 0) {
     return false;
@@ -42,6 +52,9 @@ function hasExpectedHeaders(rows: readonly SourceKeywordCsvRow[]): boolean {
   return Object.hasOwn(sample, 'Track') && Object.hasOwn(sample, 'Level');
 }
 
+/**
+ * parseSourceRows: internal utility for this module.
+ */
 function parseSourceRows(content: string): readonly SourceKeywordCsvRow[] {
   let semicolonRows: readonly SourceKeywordCsvRow[] = [];
 
@@ -72,6 +85,9 @@ function parseSourceRows(content: string): readonly SourceKeywordCsvRow[] {
  * Example: "Introduction to Testing, Test Case Design" becomes
  * ["Introduction to Testing", "Test Case Design"] so each keyword is processed independently.
  */
+/**
+ * splitAndCleanKeywordCell: public helper used by other modules.
+ */
 export function splitAndCleanKeywordCell(value: string | undefined): readonly string[] {
   if (!value) {
     return [];
@@ -83,6 +99,9 @@ export function splitAndCleanKeywordCell(value: string | undefined): readonly st
     .filter((entry) => entry.length > 0);
 }
 
+/**
+ * compareNormalizedRows: internal utility for this module.
+ */
 function compareNormalizedRows(a: NormalizedKeywordRow, b: NormalizedKeywordRow): number {
   if (a.track !== b.track) {
     return a.track.localeCompare(b.track);
@@ -96,6 +115,9 @@ function compareNormalizedRows(a: NormalizedKeywordRow, b: NormalizedKeywordRow)
   return a.keyword.localeCompare(b.keyword);
 }
 
+/**
+ * normalizeSourceRows: public helper used by other modules.
+ */
 export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): readonly NormalizedKeywordRow[] {
   const normalized: NormalizedKeywordRow[] = [];
   const seen = new Set<string>();
@@ -130,11 +152,17 @@ export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): reado
   return normalized.sort(compareNormalizedRows);
 }
 
+/**
+ * normalizeKeywordsFromString: public helper used by other modules.
+ */
 export function normalizeKeywordsFromString(content: string): readonly NormalizedKeywordRow[] {
   const parsedRows = parseSourceRows(content);
   return normalizeSourceRows(parsedRows);
 }
 
+/**
+ * normalizeKeywordsFile: public helper used by other modules.
+ */
 export async function normalizeKeywordsFile(
   params: NormalizeKeywordsFileParams
 ): Promise<{ readonly rows: readonly NormalizedKeywordRow[]; readonly writtenTo: string }> {
