@@ -1,3 +1,10 @@
+/**
+ * src/udemy/searchTransport.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { Page, Response } from 'playwright';
 
 interface CandidateApiResponse {
@@ -10,6 +17,9 @@ const EXCLUDED_API_PATTERNS = ['/structured-data/tags/', 'learning_path_folder']
 const URL_HINTS = ['search', 'courses', 'discovery', 'organization/search'];
 const RESULT_KEYS = ['results', 'items', 'courses', 'count', 'next'];
 
+/**
+ * isCandidateApiUrl: public helper used by other modules.
+ */
 export function isCandidateApiUrl(url: string): boolean {
   const normalized = url.toLowerCase();
   if (!normalized.includes('/api-2.0/')) {
@@ -18,11 +28,17 @@ export function isCandidateApiUrl(url: string): boolean {
   return !EXCLUDED_API_PATTERNS.some((pattern) => normalized.includes(pattern));
 }
 
+/**
+ * looksLikeSearchResultsUrl: public helper used by other modules.
+ */
 export function looksLikeSearchResultsUrl(url: string): boolean {
   const normalized = url.toLowerCase();
   return URL_HINTS.some((hint) => normalized.includes(hint));
 }
 
+/**
+ * collectShape: internal utility for this module.
+ */
 function collectShape(payload: unknown): string {
   if (!payload || typeof payload !== 'object') {
     return 'unknown';
@@ -31,6 +47,9 @@ function collectShape(payload: unknown): string {
   return keys.join(',');
 }
 
+/**
+ * payloadLooksLikeSearchResults: internal utility for this module.
+ */
 function payloadLooksLikeSearchResults(payload: unknown): boolean {
   if (!payload || typeof payload !== 'object') {
     return false;
@@ -39,11 +58,17 @@ function payloadLooksLikeSearchResults(payload: unknown): boolean {
   return RESULT_KEYS.some((key) => key in record);
 }
 
+/**
+ * urlPrefix: internal utility for this module.
+ */
 function urlPrefix(url: string): string {
   const parsed = new URL(url);
   return `${parsed.origin}${parsed.pathname}`;
 }
 
+/**
+ * matchesPageForUrl: public helper used by other modules.
+ */
 export function matchesPageForUrl(url: string, pageNum: number): boolean {
   const parsed = new URL(url);
   const p = parsed.searchParams.get('p') ?? parsed.searchParams.get('page') ?? parsed.searchParams.get('offset');
@@ -60,6 +85,9 @@ export function matchesPageForUrl(url: string, pageNum: number): boolean {
   return false;
 }
 
+/**
+ * safeJson: public helper used by other modules.
+ */
 export async function safeJson(response: Response): Promise<unknown | undefined> {
   const contentType = response.headers()['content-type'];
   if (!contentType || !contentType.toLowerCase().includes('application/json')) {
@@ -73,6 +101,9 @@ export async function safeJson(response: Response): Promise<unknown | undefined>
   }
 }
 
+/**
+ * sniffSearchResultsEndpoint: public helper used by other modules.
+ */
 export async function sniffSearchResultsEndpoint(page: Page, timeoutMs: number): Promise<readonly string[]> {
   const seen = new Map<string, CandidateApiResponse>();
 
@@ -124,6 +155,9 @@ export async function sniffSearchResultsEndpoint(page: Page, timeoutMs: number):
   return enriched.map((item) => item.url);
 }
 
+/**
+ * waitForResponseOrClose: public helper used by other modules.
+ */
 export async function waitForResponseOrClose(
   page: Page,
   predicate: (r: Response) => boolean,
@@ -156,6 +190,9 @@ export async function waitForResponseOrClose(
   return Promise.race([responsePromise, closedPromise]);
 }
 
+/**
+ * buildResponsePredicate: public helper used by other modules.
+ */
 export function buildResponsePredicate(candidates: readonly string[], pageNum: number): (response: Response) => boolean {
   const candidatePrefixes = candidates.map(urlPrefix);
   return (response: Response): boolean => {
@@ -170,6 +207,9 @@ export function buildResponsePredicate(candidates: readonly string[], pageNum: n
   };
 }
 
+/**
+ * summarizeCandidates: public helper used by other modules.
+ */
 export function summarizeCandidates(candidates: readonly string[]): readonly string[] {
   return candidates.slice(0, 5);
 }

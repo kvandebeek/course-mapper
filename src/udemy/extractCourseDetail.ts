@@ -1,3 +1,10 @@
+/**
+ * src/udemy/extractCourseDetail.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { Page } from 'playwright';
 
 export interface CourseDetail {
@@ -29,6 +36,9 @@ export type CourseDetailExtractionResult =
     };
   };
 
+/**
+ * extractCourseDetail: public helper used by other modules.
+ */
 export async function extractCourseDetail(page: Page, keyword: string, courseUrl: string): Promise<CourseDetailExtractionResult> {
   const currentUrl = page.url();
   const pageTitle = await page.title().catch(() => '');
@@ -58,6 +68,9 @@ export async function extractCourseDetail(page: Page, keyword: string, courseUrl
   };
 }
 
+/**
+ * extractDetailFromScripts: internal utility for this module.
+ */
 async function extractDetailFromScripts(page: Page, keyword: string, courseUrl: string, pageTitle: string): Promise<CourseDetail | null> {
   const html = await page.content();
   const canonical = await page.locator('meta[property="og:url"]').first().getAttribute('content').catch(() => null);
@@ -90,6 +103,9 @@ interface ParsedLdCourse {
   ratingCount?: number;
 }
 
+/**
+ * parseLdCourse: internal utility for this module.
+ */
 function parseLdCourse(rawEntries: readonly string[]): ParsedLdCourse | null {
   for (const entry of rawEntries) {
     try {
@@ -118,6 +134,9 @@ function parseLdCourse(rawEntries: readonly string[]): ParsedLdCourse | null {
   return null;
 }
 
+/**
+ * pickCourseObject: internal utility for this module.
+ */
 function pickCourseObject(parsed: unknown): Record<string, unknown> | null {
   if (Array.isArray(parsed)) {
     for (const item of parsed) {
@@ -147,6 +166,9 @@ function pickCourseObject(parsed: unknown): Record<string, unknown> | null {
   return null;
 }
 
+/**
+ * parseUdRuntimePayload: internal utility for this module.
+ */
 function parseUdRuntimePayload(html: string): RuntimeExtraction | null {
   const marker = 'window.UD';
   const markerIndex = html.indexOf(marker);
@@ -191,6 +213,9 @@ function parseUdRuntimePayload(html: string): RuntimeExtraction | null {
   }
 }
 
+/**
+ * extractBalancedJson: internal utility for this module.
+ */
 function extractBalancedJson(input: string, startIndex: number): string | null {
   let depth = 0;
   let inString = false;
@@ -231,6 +256,9 @@ function extractBalancedJson(input: string, startIndex: number): string | null {
   return null;
 }
 
+/**
+ * findCourseObject: internal utility for this module.
+ */
 function findCourseObject(input: unknown): Record<string, unknown> | null {
   const stack: unknown[] = [input];
   const visited = new Set<unknown>();
@@ -263,6 +291,9 @@ function findCourseObject(input: unknown): Record<string, unknown> | null {
   return null;
 }
 
+/**
+ * firstNonEmpty: internal utility for this module.
+ */
 function firstNonEmpty(...values: Array<string | undefined>): string {
   for (const value of values) {
     if (typeof value === 'string' && value.trim().length > 0) {
@@ -272,10 +303,16 @@ function firstNonEmpty(...values: Array<string | undefined>): string {
   return '';
 }
 
+/**
+ * toOptionalString: internal utility for this module.
+ */
 function toOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
+/**
+ * toOptionalNumber: internal utility for this module.
+ */
 function toOptionalNumber(value: unknown): number | undefined {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : undefined;
@@ -287,10 +324,16 @@ function toOptionalNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+/**
+ * asRecord: internal utility for this module.
+ */
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? value as Record<string, unknown> : null;
 }
 
+/**
+ * isString: internal utility for this module.
+ */
 function isString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }

@@ -1,8 +1,18 @@
+/**
+ * src/courseEnricher.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { BrowserContext } from 'playwright';
 import { Logger } from './logger.js';
 import { CourseRaw, SearchResultPayload } from './types.js';
 import { withRetry } from './utils/retry.js';
 
+/**
+ * enrichCourses: public helper used by other modules.
+ */
 export async function enrichCourses(
   context: BrowserContext,
   keyword: string,
@@ -50,6 +60,9 @@ export async function enrichCourses(
   return results;
 }
 
+/**
+ * fetchCourseDetails: internal utility for this module.
+ */
 async function fetchCourseDetails(
   context: BrowserContext,
   keyword: string,
@@ -95,6 +108,9 @@ async function fetchCourseDetails(
   };
 }
 
+/**
+ * mapFallback: internal utility for this module.
+ */
 function mapFallback(keyword: string, item: SearchResultPayload): CourseRaw {
   return {
     keyword,
@@ -111,6 +127,9 @@ function mapFallback(keyword: string, item: SearchResultPayload): CourseRaw {
   };
 }
 
+/**
+ * extractDurationMinutes: internal utility for this module.
+ */
 function extractDurationMinutes(estimatedContentLength: unknown, contentInfo: unknown): number | null {
   const seconds = toNumber(estimatedContentLength);
   if (seconds && seconds > 0) {
@@ -125,6 +144,9 @@ function extractDurationMinutes(estimatedContentLength: unknown, contentInfo: un
   return null;
 }
 
+/**
+ * toNumber: internal utility for this module.
+ */
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null;
@@ -136,6 +158,9 @@ function toNumber(value: unknown): number | null {
   return null;
 }
 
+/**
+ * toString: internal utility for this module.
+ */
 function toString(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }

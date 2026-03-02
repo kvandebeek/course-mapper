@@ -1,86 +1,106 @@
-# Udemy Business Top Courses Scraper (Resillion)
+# Course Mapper: Udemy Business Course Discovery CLI
 
-Production-ready Node.js + TypeScript CLI that scrapes the Resillion Udemy Business catalog and exports top courses per keyword to CSV.
+Course Mapper is a TypeScript command-line tool that discovers and ranks Udemy Business courses for a curated keyword list, then exports a CSV ready for curriculum planning and review.
 
-## Overview
-- Reads keyword mappings from `./input/keywords.csv`.
-- Reuses a persisted Playwright browser profile for SSO-authenticated sessions.
-- Uses Playwright `chromium` with `channel=chrome` by default to match a real Chrome runtime used by normal browsing.
-- Scrapes search results with API sniffing, resilient response waits, and DOM fallback extraction.
-- Output CSV: `./artifacts/udemy/top_courses.csv`
+## What this project does
 
-## Setup
-1. Install Node.js `>=20.11.0`.
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Ensure input file exists:
-   - `./input/keywords.csv`
-   - Headers: `track,level,moduleType,keyword`
+- Reads raw keyword metadata from `keywords-list.csv`.
+- Normalizes that keyword list into a deterministic machine-friendly file.
+- Opens an authenticated browser session (Playwright) against your Udemy Business tenant.
+- Scrapes search results for each keyword and fetches details for candidate courses.
+- Filters/ranks courses using a transparent score model.
+- Writes a final CSV (`artifacts/udemy/top_courses.csv`) with top matches.
 
-## First run (manual SSO, headed)
-Use headed mode and complete SSO in the opened browser profile:
+## Architecture at a glance
+
+1. **CLI orchestration** (`src/cli.ts`): parses flags, initializes session lifecycle, controls per-keyword workflow.
+2. **Keyword pipeline** (`src/keywords/*`): normalization, freshness checks, and loading.
+3. **Search + extraction** (`src/udemy/*`, `src/searchScraper.ts`): result page traversal + detail extraction.
+4. **Ranking and filtering** (`src/filter.ts`, `src/scoring.ts`, `src/courseEnricher.ts`).
+5. **Output** (`src/csvWriter.ts`) and structured logging (`src/logger.ts`).
+
+## Prerequisites
+
+- Node.js `>= 20.11.0`
+- npm
+- A Udemy Business account with access to your organization catalog
+- First run in headed mode to complete SSO in a persistent profile
+
+## Install
+
 ```bash
-npm run scrape -- --headless=false --profileDir=./artifacts/profile --browserChannel=chrome
+npm install
 ```
-If not authenticated, the CLI pauses and asks you to press ENTER after login succeeds.
 
-## Recommended run flags
+## Common commands
+
 ```bash
+# Main scrape run
 npm run scrape -- --headless=true --browserChannel=chrome --concurrency=1 --throttleMs=900 --maxPages=8
+
+# First run (manual login)
+npm run scrape -- --headless=false --profileDir=./artifacts/profile --browserChannel=chrome
+
+# Normalize keywords only
+npm run normalize-keywords
+
+# Smoke check
+npm run smoke
+
+# Tests
+npm test
 ```
-Recommended defaults for Udemy Business stability:
-- `--browserChannel=chrome`
-- `--concurrency=1`
-- `--throttleMs` >= `700`
-- conservative `--maxPages`
 
-## CLI flags
-- `--headless` (default: `false`)
-- `--debug` (default: `false`)
-- `--browserChannel` (default: `chrome`, allowed: `chrome|msedge|chromium`)
-- `--maxCoursesPerKeyword` (default: `200`)
-- `--maxPages` (default: `15`)
-- `--throttleMs` (default: `300`, plus built-in jitter 400-1200ms)
-- `--concurrency` (default: `1`)
-- `--profileDir` (default: `./artifacts/profile`)
+## CLI options
 
-Use `--help` to print CLI help at runtime.
+- `--headless=true|false`
+- `--debug=true|false`
+- `--browserChannel=chrome|msedge|chromium`
+- `--maxCoursesPerKeyword=<number>`
+- `--maxPages=<number>`
+- `--throttleMs=<number>`
+- `--concurrency=<number>` *(currently pinned to safe sequential behavior in config parsing)*
+- `--profileDir=<path>`
+- `--keywordsFile=<path>`
+- `--normalizedKeywordsFile=<path>`
 
-## Search resilience behavior
-- Detects the UI error state `search is currently unavailable`.
-- Retries page reload up to 3 times using exponential backoff + jitter.
-- If still unavailable, skips the keyword gracefully and records `status=failed` + `failureReason` in CSV output.
-- Stops pagination when unique result count does not increase.
-- Uses network endpoint sniffing to avoid non-result endpoints (for example, `learning_path_folder` tags).
-- Falls back to DOM extraction if API capture fails.
+Run `npm run scrape -- --help` for a quick runtime summary.
 
-## Output CSV format
-`./artifacts/udemy/top_courses.csv`
+## Input and output
 
-Columns:
-- `track,level,moduleType,keyword,courseId,url,title,language,durationMinutes,udemyLevel,category,rating,ratingCount,score,status,failureReason`
+### Input
+
+`keywords-list.csv` with headers:
+
+```csv
+track,level,moduleType,keyword
+```
+
+### Output
+
+`artifacts/udemy/top_courses.csv` with at least:
+
+- `keyword`
+- `courseTitle`
+- `courseUrl`
+- `rating`
+- `ratingCount`
+
+## Reliability and anti-flake design
+
+- Persistent browser context for SSO stability.
+- Conservative throttling with jitter/backoff for rate-limit conditions.
+- Defensive parsing for API payload shape drift.
+- Navigation controls to keep scraper actions in one tab.
+- Graceful per-keyword failure handling so one bad query does not fail the run.
 
 ## Troubleshooting
-- **“Sorry, search is currently unavailable” appears**:
-  - Likely rate limiting or anti-bot fingerprinting.
-  - Run slower (`--concurrency=1`, higher `--throttleMs`, lower `--maxPages`).
-  - Prefer `--browserChannel=chrome`.
-  - Retry with a fresh profile directory and re-run SSO.
-- **Chrome channel is missing**:
-  - Install Chrome (or use `--browserChannel=msedge`).
-  - Scraper logs a warning and falls back to Playwright Chromium automatically.
-- **Login keeps failing in headless mode**:
-  - run with `--headless=false` and complete SSO manually once.
-- **Empty results**:
-  - verify keyword relevance, account access, and that filters are not excluding all courses.
 
-## Smoke check
-Run lifecycle smoke check:
-```bash
-npm run smoke
-```
+- **Not authenticated in headless mode**: run once with `--headless=false` and complete SSO.
+- **Search temporarily unavailable**: reduce speed (`--concurrency=1`, increase `--throttleMs`, reduce `--maxPages`).
+- **No rows exported**: validate keyword quality and account permissions in the tenant.
+- **Browser channel errors**: install Chrome/Edge or use `--browserChannel=chromium`.
 
-## Compliance note
-Use responsibly. Respect Udemy Business terms of use, organizational policies, and platform rate limits.
+## Responsible use
+
+Use this tooling within your organization’s approved automation policy and Udemy Business terms.

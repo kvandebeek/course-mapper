@@ -1,9 +1,22 @@
+/**
+ * src/udemy/types.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 export type UnknownRecord = Record<string, unknown>;
 
+/**
+ * isRecord: public helper used by other modules.
+ */
 export function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+/**
+ * asRecordArray: internal utility for this module.
+ */
 function asRecordArray(value: unknown): readonly UnknownRecord[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
@@ -19,6 +32,9 @@ function asRecordArray(value: unknown): readonly UnknownRecord[] | undefined {
   return recordItems;
 }
 
+/**
+ * tryExtractHits: public helper used by other modules.
+ */
 export function tryExtractHits(payload: unknown): readonly UnknownRecord[] | undefined {
   if (!isRecord(payload)) {
     return undefined;

@@ -1,3 +1,10 @@
+/**
+ * src/runtime/sessionManager.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import * as path from 'node:path';
 import { BrowserType, chromium } from 'playwright';
 import { Logger } from '../logger.js';
@@ -17,12 +24,18 @@ export interface SessionManager {
   closeSession(): Promise<void>;
 }
 
+/**
+ * createSessionManager: public helper used by other modules.
+ */
 export function createSessionManager(options: SessionManagerOptions): SessionManager {
   const browserType = options.browserType ?? chromium;
   const profileDir = path.resolve(options.profileDir);
   let session: RuntimeSession | null = null;
   let creating: Promise<RuntimeSession> | null = null;
 
+/**
+ * createSession: internal utility for this module.
+ */
   async function createSession(): Promise<RuntimeSession> {
     const preferredChannel = options.browserChannel === 'chromium' ? 'chrome' : options.browserChannel;
 
@@ -60,6 +73,9 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     return runtimeSession;
   }
 
+/**
+ * getOrCreateSession: internal utility for this module.
+ */
   async function getOrCreateSession(): Promise<RuntimeSession> {
     if (session && !session.isClosed()) {
       options.logger.debug('Reusing active runtime session');
@@ -88,6 +104,9 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     return creating;
   }
 
+/**
+ * closeSession: internal utility for this module.
+ */
   async function closeSession(): Promise<void> {
     if (!session) {
       return;

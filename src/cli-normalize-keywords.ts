@@ -1,6 +1,16 @@
+/**
+ * src/cli-normalize-keywords.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { getAppConfig, getCliOptions, resolvePath } from './config.js';
 import { normalizeKeywordsFile } from './keywords/normalizeKeywords.js';
 
+/**
+ * main: internal utility for this module.
+ */
 async function main(): Promise<void> {
   const cli = getCliOptions(process.argv);
   const config = getAppConfig();

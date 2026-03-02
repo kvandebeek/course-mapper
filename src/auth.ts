@@ -1,8 +1,18 @@
+/**
+ * src/auth.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import * as readline from 'node:readline/promises';
 import { Logger } from './logger.js';
 import { RuntimeSession } from './runtime/session.js';
 import { SessionManager } from './runtime/sessionManager.js';
 
+/**
+ * initAuthenticatedSession: public helper used by other modules.
+ */
 export async function initAuthenticatedSession(
   sessionManager: SessionManager,
   baseUrl: string,
@@ -40,6 +50,9 @@ export async function initAuthenticatedSession(
   return session;
 }
 
+/**
+ * checkLoggedIn: internal utility for this module.
+ */
 async function checkLoggedIn(page: RuntimeSession['page'], baseUrl: string, orgHomePath: string): Promise<boolean> {
   const current = page.url();
   if (!current.startsWith(baseUrl)) {

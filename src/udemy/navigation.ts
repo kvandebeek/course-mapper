@@ -1,3 +1,10 @@
+/**
+ * src/udemy/navigation.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { BrowserContext, Page } from 'playwright';
@@ -16,6 +23,9 @@ export interface SearchFilters {
 
 export const UDEMY_ORIGIN = 'https://resillion.udemy.com' as const;
 
+/**
+ * buildSearchUrl: public helper used by other modules.
+ */
 export function buildSearchUrl(keyword: string, filters: SearchFilters): string {
   const url = new URL('/organization/search/', UDEMY_ORIGIN);
   url.searchParams.set('src', 'ukw');
@@ -43,6 +53,9 @@ export function buildSearchUrl(keyword: string, filters: SearchFilters): string 
   return url.toString();
 }
 
+/**
+ * enforceSameTabNavigation: public helper used by other modules.
+ */
 export function enforceSameTabNavigation(context: BrowserContext, page: Page): void {
   page.on('popup', (popupPage) => {
     void popupPage.close().catch(() => {});
@@ -55,6 +68,9 @@ export function enforceSameTabNavigation(context: BrowserContext, page: Page): v
   });
 }
 
+/**
+ * gotoWithRetries: public helper used by other modules.
+ */
 export async function gotoWithRetries(
   page: Page,
   url: string,
@@ -97,6 +113,9 @@ export async function gotoWithRetries(
   });
 }
 
+/**
+ * buildPaginatedUrl: public helper used by other modules.
+ */
 export function buildPaginatedUrl(baseUrl: string, pageIndex: number, variant: 'p' | 'page' | 'pageNumber' | 'start', pageSize: number): string {
   const url = new URL(baseUrl);
   if (variant === 'start') {
@@ -107,10 +126,16 @@ export function buildPaginatedUrl(baseUrl: string, pageIndex: number, variant: '
   return url.toString();
 }
 
+/**
+ * sanitizeToken: internal utility for this module.
+ */
 function sanitizeToken(input: string): string {
   return input.replace(/[^a-z0-9-_]+/gi, '_').slice(0, 80) || 'unknown';
 }
 
+/**
+ * writeNavigationFailureArtifacts: public helper used by other modules.
+ */
 export async function writeNavigationFailureArtifacts(page: Page, prefix: string, targetUrl: string, error: unknown, keyword?: string): Promise<void> {
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const slug = sanitizeToken(`${prefix}_${keyword ?? 'na'}_${ts}`);

@@ -1,5 +1,15 @@
+/**
+ * src/scoring.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { CourseRaw, CourseScored, KeywordRow } from './types.js';
 
+/**
+ * scoreAndSelectTopThree: public helper used by other modules.
+ */
 export function scoreAndSelectTopThree(courses: CourseRaw[], keywordRow: KeywordRow): CourseScored[] {
   const scored = courses
     .map((course) => {

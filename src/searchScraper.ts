@@ -1,3 +1,10 @@
+/**
+ * src/searchScraper.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -29,10 +36,16 @@ export interface ScrapeKeywordResult {
   readonly failureReason?: string;
 }
 
+/**
+ * shouldStopPagination: public helper used by other modules.
+ */
 export function shouldStopPagination(previousUniqueTotal: number, newUniqueTotal: number): boolean {
   return newUniqueTotal - previousUniqueTotal <= 0;
 }
 
+/**
+ * sleepWithJitter: public helper used by other modules.
+ */
 export async function sleepWithJitter(baseMs: number, jitterMinMs: number, jitterMaxMs: number): Promise<void> {
   const jitterSpan = Math.max(0, jitterMaxMs - jitterMinMs);
   const randomInt = jitterSpan === 0 ? 0 : crypto.randomInt(0, jitterSpan + 1);
@@ -40,11 +53,17 @@ export async function sleepWithJitter(baseMs: number, jitterMinMs: number, jitte
   await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
+/**
+ * isSearchUnavailable: public helper used by other modules.
+ */
 export async function isSearchUnavailable(page: Page): Promise<boolean> {
   const bodyText = await page.locator('body').innerText().catch(() => '');
   return bodyText.toLowerCase().includes('search is currently unavailable');
 }
 
+/**
+ * extractCoursesFromDom: public helper used by other modules.
+ */
 export async function extractCoursesFromDom(page: Page): Promise<readonly SearchResultPayload[]> {
   const cards = page.locator('[data-testid="course-card-title"], [data-purpose="search-course-card-title"]');
   const count = await cards.count();
@@ -76,6 +95,9 @@ export async function extractCoursesFromDom(page: Page): Promise<readonly Search
   return found;
 }
 
+/**
+ * scrapeKeywordCourses: public helper used by other modules.
+ */
 export async function scrapeKeywordCourses(
   session: RuntimeSession,
   baseUrl: string,
@@ -177,6 +199,9 @@ export async function scrapeKeywordCourses(
   return failure ? { courses, failureReason: failure.reason } : { courses };
 }
 
+/**
+ * extractViaApiOrDom: internal utility for this module.
+ */
 async function extractViaApiOrDom(
   page: Page,
   pageNum: number,
@@ -200,6 +225,9 @@ async function extractViaApiOrDom(
   return extractCoursesFromDom(page);
 }
 
+/**
+ * logBadStatus: internal utility for this module.
+ */
 function logBadStatus(response: Response, logger: Logger, keyword: string, pageNum: number): void {
   const status = response.status();
   if (status === 401 || status === 403 || status === 429 || status >= 500) {
@@ -208,6 +236,9 @@ function logBadStatus(response: Response, logger: Logger, keyword: string, pageN
   }
 }
 
+/**
+ * attachPageObservers: internal utility for this module.
+ */
 function attachPageObservers(page: Page, keyword: string, pageNum: number, logger: Logger): void {
   page.removeAllListeners('console');
   page.removeAllListeners('pageerror');
@@ -224,6 +255,9 @@ function attachPageObservers(page: Page, keyword: string, pageNum: number, logge
   });
 }
 
+/**
+ * recoverUnavailableSearch: internal utility for this module.
+ */
 async function recoverUnavailableSearch(page: Page, keyword: string, pageNum: number, logger: Logger): Promise<boolean> {
   const unavailable = await isSearchUnavailable(page);
   if (!unavailable) {
@@ -244,6 +278,9 @@ async function recoverUnavailableSearch(page: Page, keyword: string, pageNum: nu
   return false;
 }
 
+/**
+ * recoverFromPageOrContextClosure: internal utility for this module.
+ */
 async function recoverFromPageOrContextClosure(page: Page, errorMessage: string, logger: Logger): Promise<void> {
   const closedPage = page.isClosed();
   const closureError = errorMessage.toLowerCase().includes('context or browser has been closed');
@@ -253,6 +290,9 @@ async function recoverFromPageOrContextClosure(page: Page, errorMessage: string,
   }
 }
 
+/**
+ * captureDiagnostics: internal utility for this module.
+ */
 async function captureDiagnostics(
   page: Page,
   keyword: string,
@@ -280,6 +320,9 @@ async function captureDiagnostics(
   }
 }
 
+/**
+ * buildSearchUrl: internal utility for this module.
+ */
 function buildSearchUrl(baseUrl: string, keyword: string, pageNum: number): string {
   const query = new URL('/organization/search/', baseUrl);
   query.searchParams.set('q', keyword);
@@ -288,6 +331,9 @@ function buildSearchUrl(baseUrl: string, keyword: string, pageNum: number): stri
   return query.toString();
 }
 
+/**
+ * mapHitToSearchPayload: internal utility for this module.
+ */
 function mapHitToSearchPayload(course: UnknownRecord): SearchResultPayload | null {
   const idValue = course.id;
   const title = toString(course.title);
@@ -310,14 +356,23 @@ function mapHitToSearchPayload(course: UnknownRecord): SearchResultPayload | nul
   };
 }
 
+/**
+ * sanitizeKeyword: internal utility for this module.
+ */
 function sanitizeKeyword(keyword: string): string {
   return keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'keyword';
 }
 
+/**
+ * toString: internal utility for this module.
+ */
 function toString(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
+/**
+ * toNumber: internal utility for this module.
+ */
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null;
@@ -329,6 +384,9 @@ function toNumber(value: unknown): number | null {
   return null;
 }
 
+/**
+ * normalizeUrl: internal utility for this module.
+ */
 function normalizeUrl(url: string): string {
   if (!url) {
     return '';

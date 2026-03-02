@@ -1,3 +1,10 @@
+/**
+ * src/utils/throttle.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
 import { Logger } from '../logger.js';
 
 const DEFAULT_JITTER_RATIO = 0.25;
@@ -5,10 +12,16 @@ const DEFAULT_BACKOFF_BASE_MS = 10_000;
 const DEFAULT_BACKOFF_MAX_MS = 90_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 
+/**
+ * sleepMs: public helper used by other modules.
+ */
 export function sleepMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
 }
 
+/**
+ * jitterMs: internal utility for this module.
+ */
 function jitterMs(baseMs: number, jitterRatio: number): number {
   const spread = Math.max(0, baseMs * Math.max(0, jitterRatio));
   const offset = (Math.random() * 2 - 1) * spread;
@@ -30,6 +43,9 @@ interface RateLimitSignal {
   readonly type: string;
 }
 
+/**
+ * classifyRateLimit: internal utility for this module.
+ */
 function classifyRateLimit(error: unknown): RateLimitSignal {
   if (typeof error === 'object' && error !== null && 'status' in error) {
     const status = (error as { status?: unknown }).status;
@@ -55,6 +71,9 @@ function classifyRateLimit(error: unknown): RateLimitSignal {
   return { detected: false, type: 'unknown' };
 }
 
+/**
+ * throttled<T>: public helper used by other modules.
+ */
 export async function throttled<T>(fn: () => Promise<T>, opts: ThrottledOptions): Promise<T> {
   const maxAttempts = opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const jitterRatio = opts.jitterRatio ?? DEFAULT_JITTER_RATIO;

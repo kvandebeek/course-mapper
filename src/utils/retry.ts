@@ -1,3 +1,13 @@
+/**
+ * src/utils/retry.ts
+ *
+ * Purpose: documents the responsibilities of this module so new contributors can
+ * quickly understand where it sits in the scraping pipeline.
+ */
+
+/**
+ * withRetry<T>: public helper used by other modules.
+ */
 export async function withRetry<T>(
   action: () => Promise<T>,
   maxRetries: number,
