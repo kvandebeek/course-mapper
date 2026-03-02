@@ -23,120 +23,317 @@ interface RuntimeExtraction {
   canonicalUrl?: string;
 }
 
-export async function extractCourseDetail(page: Page, keyword: string, courseUrl: string): Promise<CourseDetail> {
-  const runtime = await page.evaluate(() => {
-    const root = window as unknown as Record<string, unknown>;
-
-    const visited = new WeakSet<object>();
-
-    const findCourseObject = (value: unknown): Record<string, unknown> | null => {
-      if (!value || typeof value !== 'object') {
-        return null;
-      }
-      if (visited.has(value as object)) {
-        return null;
-      }
-      visited.add(value as object);
-
-      const obj = value as Record<string, unknown>;
-      const hasCourseSignals = (
-        typeof obj.title === 'string'
-        && (typeof obj.id === 'number' || typeof obj.courseId === 'number' || typeof obj.avg_rating === 'number' || typeof obj.rating === 'number')
-      );
-      if (hasCourseSignals) {
-        return obj;
-      }
-
-      for (const nested of Object.values(obj)) {
-        const found = findCourseObject(nested);
-        if (found) {
-          return found;
-        }
-      }
-      return null;
+export type CourseDetailExtractionResult =
+  | { readonly ok: true; readonly data: CourseDetail }
+  | {
+    readonly ok: false;
+    readonly reason: string;
+    readonly diagnostics: {
+      readonly url: string;
+      readonly title: string;
+      readonly primaryContainerSnippet: string;
     };
+  };
 
-    const courseObject = findCourseObject(root.UD);
+export async function extractCourseDetail(page: Page, keyword: string, courseUrl: string): Promise<CourseDetailExtractionResult> {
+  const currentUrl = page.url();
+  const pageTitle = await page.title().catch(() => '');
+  const mainContainer = page.locator('main').first();
+  const mainCount = await mainContainer.count().catch(() => 0);
+  const primaryContainerSnippet = mainCount > 0
+    ? await mainContainer.innerHTML().then((html) => html.slice(0, 1_200)).catch(() => '')
+    : '';
 
-    const metaContent = (selector: string): string | undefined => {
-      const node = document.querySelector(selector);
-      return node instanceof HTMLMetaElement ? node.content : undefined;
+  const detail = await extractDetailFromScripts(page, keyword, courseUrl, pageTitle);
+
+  if (!detail) {
+    return {
+      ok: false,
+      reason: 'missing_course_payload',
+      diagnostics: {
+        url: currentUrl,
+        title: pageTitle,
+        primaryContainerSnippet
+      }
     };
-
-    const parseInstructors = (value: unknown): string[] => {
-      if (!Array.isArray(value)) {
-        return [];
-      }
-      return value
-        .map((entry) => {
-          if (entry && typeof entry === 'object') {
-            const obj = entry as Record<string, unknown>;
-            return typeof obj.display_name === 'string' ? obj.display_name : null;
-          }
-          return null;
-        })
-        .filter((item): item is string => Boolean(item));
-    };
-
-    if (!courseObject) {
-      const fallback: RuntimeExtraction = {
-        title: metaContent('meta[property=\"og:title\"]') ?? document.title
-      };
-      const fallbackCanonical = metaContent('meta[property=\"og:url\"]');
-      if (fallbackCanonical) {
-        fallback.canonicalUrl = fallbackCanonical;
-      }
-      return fallback;
-    }
-
-    const instructorNames = parseInstructors(courseObject.visible_instructors ?? courseObject.instructors);
-    const result: RuntimeExtraction = {
-      title: typeof courseObject.title === 'string' ? courseObject.title : document.title,
-      instructors: instructorNames
-    };
-
-    const courseId = typeof courseObject.id === 'number' ? courseObject.id : typeof courseObject.courseId === 'number' ? courseObject.courseId : undefined;
-    if (courseId !== undefined) { result.courseId = courseId; }
-    const rating = parseNum(courseObject.avg_rating ?? courseObject.rating);
-    if (rating !== undefined) { result.rating = rating; }
-    const ratingCount = parseNum(courseObject.num_reviews ?? courseObject.rating_count);
-    if (ratingCount !== undefined) { result.ratingCount = ratingCount; }
-    const lastUpdateDate = toDateText(courseObject.last_update_date ?? courseObject.lastUpdateDate);
-    if (lastUpdateDate) { result.lastUpdateDate = lastUpdateDate; }
-    const publishedDate = toDateText(courseObject.published_time ?? courseObject.publishedDate);
-    if (publishedDate) { result.publishedDate = publishedDate; }
-    const canonical = metaContent('meta[property=\"og:url\"]');
-    if (canonical) { result.canonicalUrl = canonical; }
-
-    return result;
-
-    function parseNum(input: unknown): number | undefined {
-      if (typeof input === 'number') {
-        return Number.isFinite(input) ? input : undefined;
-      }
-      if (typeof input === 'string') {
-        const value = Number(input);
-        return Number.isFinite(value) ? value : undefined;
-      }
-      return undefined;
-    }
-
-    function toDateText(input: unknown): string | undefined {
-      return typeof input === 'string' && input.length > 0 ? input : undefined;
-    }
-  });
-
-  const canonical = runtime.canonicalUrl && runtime.canonicalUrl.length > 0 ? runtime.canonicalUrl : courseUrl;
+  }
 
   return {
-    keyword,
-    courseId: runtime.courseId ?? null,
-    title: runtime.title?.trim() || 'Untitled Course',
-    url: canonical,
-    rating: runtime.rating ?? null,
-    ratingCount: runtime.ratingCount ?? null,
-    lastUpdateDate: runtime.lastUpdateDate ?? null,
-    publishedDate: runtime.publishedDate ?? null,
-    instructors: runtime.instructors ?? []
+    ok: true,
+    data: detail
   };
+}
+
+async function extractDetailFromScripts(page: Page, keyword: string, courseUrl: string, pageTitle: string): Promise<CourseDetail | null> {
+  const html = await page.content();
+  const canonical = await page.locator('meta[property="og:url"]').first().getAttribute('content').catch(() => null);
+  const ldJsonTexts = await page.locator('script[type="application/ld+json"]').allTextContents().catch(() => []);
+
+  const ldCourse = parseLdCourse(ldJsonTexts);
+  const runtimeCourse = parseUdRuntimePayload(html);
+
+  const title = firstNonEmpty(runtimeCourse?.title, ldCourse?.name, pageTitle, 'Untitled Course');
+  const runtimeInstructors = runtimeCourse?.instructors ?? [];
+  const instructors = runtimeInstructors.length > 0 ? runtimeInstructors : (ldCourse?.instructors ?? []);
+
+  const result: CourseDetail = {
+    keyword,
+    courseId: runtimeCourse?.courseId ?? null,
+    title,
+    url: firstNonEmpty(canonical ?? undefined, ldCourse?.url, courseUrl),
+    rating: runtimeCourse?.rating ?? ldCourse?.ratingValue ?? null,
+    ratingCount: runtimeCourse?.ratingCount ?? ldCourse?.ratingCount ?? null,
+    lastUpdateDate: runtimeCourse?.lastUpdateDate ?? null,
+    publishedDate: runtimeCourse?.publishedDate ?? ldCourse?.datePublished ?? null,
+    instructors
+  };
+
+  if (!runtimeCourse && !ldCourse) {
+    return null;
+  }
+
+  return result;
+}
+
+interface ParsedLdCourse {
+  name?: string;
+  url?: string;
+  ratingValue?: number;
+  ratingCount?: number;
+  datePublished?: string;
+  instructors: readonly string[];
+}
+
+function parseLdCourse(rawEntries: readonly string[]): ParsedLdCourse | null {
+  for (const entry of rawEntries) {
+    try {
+      const parsed = JSON.parse(entry) as unknown;
+      const candidate = pickCourseObject(parsed);
+      if (!candidate) {
+        continue;
+      }
+
+      const aggregate = asRecord(candidate.aggregateRating);
+      const author = candidate.author;
+
+      const instructors = Array.isArray(author)
+        ? author.map((value) => asRecord(value)?.name).filter(isString)
+        : isString(asRecord(author)?.name)
+          ? [asRecord(author)?.name as string]
+          : [];
+
+      const result: ParsedLdCourse = { instructors };
+      const name = toOptionalString(candidate.name);
+      if (name) { result.name = name; }
+      const url = toOptionalString(candidate.url);
+      if (url) { result.url = url; }
+      const ratingValue = toOptionalNumber(aggregate?.ratingValue);
+      if (ratingValue !== undefined) { result.ratingValue = ratingValue; }
+      const ratingCount = toOptionalNumber(aggregate?.ratingCount);
+      if (ratingCount !== undefined) { result.ratingCount = ratingCount; }
+      const datePublished = toOptionalString(candidate.datePublished);
+      if (datePublished) { result.datePublished = datePublished; }
+      return result;
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+function pickCourseObject(parsed: unknown): Record<string, unknown> | null {
+  if (Array.isArray(parsed)) {
+    for (const item of parsed) {
+      const found = pickCourseObject(item);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  const obj = asRecord(parsed);
+  if (!obj) {
+    return null;
+  }
+
+  const type = obj['@type'];
+  if (type === 'Course') {
+    return obj;
+  }
+
+  const graph = obj['@graph'];
+  if (Array.isArray(graph)) {
+    return pickCourseObject(graph);
+  }
+
+  return null;
+}
+
+function parseUdRuntimePayload(html: string): RuntimeExtraction | null {
+  const marker = 'window.UD';
+  const markerIndex = html.indexOf(marker);
+  if (markerIndex < 0) {
+    return null;
+  }
+
+  const assignmentIndex = html.indexOf('=', markerIndex);
+  if (assignmentIndex < 0) {
+    return null;
+  }
+
+  const start = html.indexOf('{', assignmentIndex);
+  if (start < 0) {
+    return null;
+  }
+
+  const jsonPayload = extractBalancedJson(html, start);
+  if (!jsonPayload) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(jsonPayload) as unknown;
+    const courseObject = findCourseObject(parsed);
+    if (!courseObject) {
+      return null;
+    }
+
+    const instructors = parseInstructors(courseObject.visible_instructors ?? courseObject.instructors);
+
+    const result: RuntimeExtraction = { instructors };
+    const title = toOptionalString(courseObject.title);
+    if (title) { result.title = title; }
+    const courseId = toOptionalNumber(courseObject.id) ?? toOptionalNumber(courseObject.courseId);
+    if (courseId !== undefined) { result.courseId = courseId; }
+    const rating = toOptionalNumber(courseObject.avg_rating) ?? toOptionalNumber(courseObject.rating);
+    if (rating !== undefined) { result.rating = rating; }
+    const ratingCount = toOptionalNumber(courseObject.num_reviews) ?? toOptionalNumber(courseObject.rating_count);
+    if (ratingCount !== undefined) { result.ratingCount = ratingCount; }
+    const lastUpdateDate = toOptionalString(courseObject.last_update_date) ?? toOptionalString(courseObject.lastUpdateDate);
+    if (lastUpdateDate) { result.lastUpdateDate = lastUpdateDate; }
+    const publishedDate = toOptionalString(courseObject.published_time) ?? toOptionalString(courseObject.publishedDate);
+    if (publishedDate) { result.publishedDate = publishedDate; }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+function extractBalancedJson(input: string, startIndex: number): string | null {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = startIndex; i < input.length; i += 1) {
+    const char = input[i];
+    if (!char) {
+      break;
+    }
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return input.slice(startIndex, i + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+function findCourseObject(input: unknown): Record<string, unknown> | null {
+  const stack: unknown[] = [input];
+  const visited = new Set<unknown>();
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || typeof current !== 'object') {
+      continue;
+    }
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+
+    const obj = current as Record<string, unknown>;
+    if (typeof obj.title === 'string' && (
+      typeof obj.id === 'number' ||
+      typeof obj.courseId === 'number' ||
+      typeof obj.avg_rating === 'number' ||
+      typeof obj.rating === 'number'
+    )) {
+      return obj;
+    }
+
+    for (const value of Object.values(obj)) {
+      stack.push(value);
+    }
+  }
+
+  return null;
+}
+
+function parseInstructors(input: unknown): readonly string[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input
+    .map((entry) => {
+      const obj = asRecord(entry);
+      return toOptionalString(obj?.display_name);
+    })
+    .filter(isString);
+}
+
+function firstNonEmpty(...values: Array<string | undefined>): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+function toOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : null;
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
 }

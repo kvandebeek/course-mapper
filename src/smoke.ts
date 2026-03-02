@@ -1,5 +1,6 @@
 import { createLogger } from './logger.js';
 import { createSessionManager } from './runtime/sessionManager.js';
+import { extractCourseDetail } from './udemy/extractCourseDetail.js';
 
 async function main(): Promise<void> {
   const logger = createLogger(true);
@@ -7,7 +8,7 @@ async function main(): Promise<void> {
   const headless = process.env.SMOKE_HEADLESS !== 'false';
 
   const manager = createSessionManager({
-    browserChannel: "chrome",
+    browserChannel: 'chrome',
     profileDir,
     headless,
     logger
@@ -15,12 +16,27 @@ async function main(): Promise<void> {
 
   logger.info('Smoke: creating first session');
   const first = await manager.getOrCreateSession();
-  await first.ensurePage();
+  const firstPage = await first.ensurePage();
 
   logger.info('Smoke: requesting second session (should reuse)');
   const second = await manager.getOrCreateSession();
   if (first.context !== second.context) {
     throw new Error('Expected getOrCreateSession() to reuse the active session.');
+  }
+
+  const detailSmokeUrl = process.env.SMOKE_DETAIL_URL;
+  if (detailSmokeUrl) {
+    logger.info('Smoke: running detail extraction check', { detailSmokeUrl });
+    await firstPage.goto(detailSmokeUrl, { waitUntil: 'domcontentloaded' });
+    const extraction = await extractCourseDetail(firstPage, 'smoke', detailSmokeUrl);
+    if (!extraction.ok) {
+      throw new Error(`Detail extraction smoke failed: ${extraction.reason}`);
+    }
+    logger.info('Smoke: detail extraction check passed', {
+      title: extraction.data.title,
+      rating: extraction.data.rating,
+      ratingCount: extraction.data.ratingCount
+    });
   }
 
   logger.info('Smoke: closing session');
