@@ -65,66 +65,67 @@ async function main(): Promise<void> {
   logger.info('Loaded normalized keywords', { count: keywords.length });
 
   let session = await initAuthenticatedSession(sessionManager, config.baseUrl, config.orgHomePath, cli.headless, logger);
-  const page = await session.ensurePage();
-  enforceSameTabNavigation(session.context, page);
 
-  const finalRows: ExportRow[] = [];
+  try {
+    const page = await session.ensurePage();
+    enforceSameTabNavigation(session.context, page);
 
-  for (const keywordRow of keywords) {
-    const start = Date.now();
-    logger.info('Keyword processing started', { keyword: keywordRow.keyword });
+    const finalRows: ExportRow[] = [];
 
-    try {
-      session = await sessionManager.getOrCreateSession();
-      const runtimePage = await session.ensurePage();
-      enforceSameTabNavigation(session.context, runtimePage);
+    for (const keywordRow of keywords) {
+      const start = Date.now();
+      logger.info('Keyword processing started', { keyword: keywordRow.keyword });
 
-      const topCourses = await collectAndRankTopCourses(
-        runtimePage,
-        keywordRow.keyword,
-        {
-          filters: DEFAULT_FILTERS,
-          maxCourses: Math.min(cli.maxCoursesPerKeyword, 200),
-          maxPages: cli.maxPages,
-          throttleMs: cli.throttleMs
-        },
-        logger
-      );
+      try {
+        session = await sessionManager.getOrCreateSession();
+        const runtimePage = await session.ensurePage();
+        enforceSameTabNavigation(session.context, runtimePage);
 
-      finalRows.push(
-        ...topCourses.map((course) => ({
+        const topCourses = await collectAndRankTopCourses(
+          runtimePage,
+          keywordRow.keyword,
+          {
+            filters: DEFAULT_FILTERS,
+            maxCourses: Math.min(cli.maxCoursesPerKeyword, 200),
+            maxPages: cli.maxPages,
+            throttleMs: cli.throttleMs
+          },
+          logger
+        );
+
+        finalRows.push(
+          ...topCourses.map((course) => ({
+            keyword: keywordRow.keyword,
+            courseTitle: course.title,
+            courseUrl: course.url,
+            rating: course.rating ?? 0,
+            ratingCount: course.ratingCount ?? 0
+          }))
+        );
+
+        logger.info('Keyword processing completed', {
           keyword: keywordRow.keyword,
-          courseTitle: course.title,
-          courseUrl: course.url,
-          rating: course.rating ?? 0,
-          ratingCount: course.ratingCount ?? 0
-        }))
-      );
-
-      logger.info('Keyword processing completed', {
-        keyword: keywordRow.keyword,
-        visitedDetailPages: topCourses.length,
-        eligibleCount: topCourses.length,
-        exported: topCourses.length,
-        durationMs: Date.now() - start
-      });
-    } catch (error) {
-      logger.error('Keyword failed; continuing', {
-        keyword: keywordRow.keyword,
-        durationMs: Date.now() - start,
-        error: String(error)
-      });
+          visitedDetailPages: topCourses.length,
+          eligibleCount: topCourses.length,
+          exported: topCourses.length,
+          durationMs: Date.now() - start
+        });
+      } catch (error) {
+        logger.error('Keyword failed; continuing', {
+          keyword: keywordRow.keyword,
+          durationMs: Date.now() - start,
+          error: String(error)
+        });
+      }
     }
-  }
 
-  await writeOutputCsv(resolvePath(config.outputCsvPath), finalRows);
-  logger.info('Run complete', {
-    rows: finalRows.length,
-    output: config.outputCsvPath,
-    totalDurationMs: Date.now() - totalStart
-  });
-
-  if (!cli.debug) {
+    await writeOutputCsv(resolvePath(config.outputCsvPath), finalRows);
+    logger.info('Run complete', {
+      rows: finalRows.length,
+      output: config.outputCsvPath,
+      totalDurationMs: Date.now() - totalStart
+    });
+  } finally {
     await sessionManager.closeSession();
   }
 }
