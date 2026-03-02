@@ -3,7 +3,7 @@ import { createLogger } from './logger.js';
 import { loadKeywords } from './keywordLoader.js';
 import { initAuthenticatedSession } from './auth.js';
 import { writeOutputCsv } from './csvWriter.js';
-import { CourseCsvRow } from './types.js';
+import { ExportRow } from './types.js';
 import { createSessionManager } from './runtime/sessionManager.js';
 import { DEFAULT_FILTERS, collectAndRankTopCourses } from './udemy/scrapeKeyword.js';
 import { enforceSameTabNavigation } from './udemy/navigation.js';
@@ -45,7 +45,7 @@ async function main(): Promise<void> {
   const page = await session.ensurePage();
   enforceSameTabNavigation(session.context, page);
 
-  const finalRows: CourseCsvRow[] = [];
+  const finalRows: ExportRow[] = [];
 
   for (const keywordRow of keywords) {
     const start = Date.now();
@@ -62,7 +62,8 @@ async function main(): Promise<void> {
         {
           filters: DEFAULT_FILTERS,
           maxCourses: Math.min(cli.maxCoursesPerKeyword, 200),
-          maxPages: cli.maxPages
+          maxPages: cli.maxPages,
+          throttleMs: cli.throttleMs
         },
         logger,
         new Date()
@@ -73,12 +74,8 @@ async function main(): Promise<void> {
           keyword: keywordRow.keyword,
           courseTitle: course.title,
           courseUrl: course.url,
-          rating: course.rating,
-          ratingCount: course.ratingCount,
-          lastUpdateDate: course.lastUpdateDate,
-          publishedDate: course.publishedDate,
-          instructors: course.instructors.join(' | '),
-          courseId: course.courseId
+          rating: course.rating ?? 0,
+          ratingCount: course.ratingCount ?? 0
         }))
       );
 

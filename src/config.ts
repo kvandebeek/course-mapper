@@ -34,7 +34,7 @@ export function getCliOptions(argv: string[]): CliOptions {
     browserChannel: 'chrome',
     maxCoursesPerKeyword: 200,
     maxPages: 15,
-    throttleMs: 300,
+    throttleMs: 3200,
     concurrency: 1,
     profileDir: './artifacts/profile'
   };
@@ -78,7 +78,7 @@ export function getCliOptions(argv: string[]): CliOptions {
         break;
       case '--concurrency':
         if (value !== undefined) {
-          options.concurrency = Math.max(1, Number(value));
+          options.concurrency = 1;
         }
         break;
       case '--profileDir':

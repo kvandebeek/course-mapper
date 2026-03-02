@@ -9,6 +9,7 @@ import {
   gotoWithRetries,
   writeNavigationFailureArtifacts
 } from './navigation.js';
+import { sleepMs, throttled } from '../utils/throttle.js';
 
 const RESULT_WAIT_TIMEOUT_MS = 20_000;
 const LOAD_MORE_WAIT_TIMEOUT_MS = 8_000;
@@ -29,6 +30,7 @@ export async function collectCourseUrlsForKeyword(
     readonly filters: SearchFilters;
     readonly maxCourses: number;
     readonly maxPages: number;
+    readonly throttleMs: number;
   },
   logger: Logger
 ): Promise<readonly string[]> {
@@ -38,8 +40,9 @@ export async function collectCourseUrlsForKeyword(
   const unique = new Set<CourseUrl>();
 
   try {
-    await gotoWithRetries(page, baseSearchUrl);
-    await waitForSearchResultsUi(page);
+    await gotoWithRetries(page, baseSearchUrl, { operationName: 'openSearchPage', throttleMs: opts.throttleMs, logger });
+    await sleepMs(1200);
+    await waitForSearchResultsUi(page, opts.throttleMs, logger);
   } catch (error) {
     await writeNavigationFailureArtifacts(page, 'search_nav_fail', baseSearchUrl, error, keyword);
     logger.warn('Search navigation failed', { keyword, url: baseSearchUrl, error: String(error) });
@@ -62,13 +65,13 @@ export async function collectCourseUrlsForKeyword(
       break;
     }
 
-    const loadedMore = await tryLoadMoreResults(page, keyword, pageIndex, logger);
+    const loadedMore = await tryLoadMoreResults(page, keyword, pageIndex, logger, opts.throttleMs);
     if (!loadedMore) {
       logger.info('Pagination ended: no load-more action available', { keyword, pageIndex, totalUnique: unique.size });
       break;
     }
 
-    const grew = await waitForCourseAnchorGrowth(page, iteration.courseLikeAnchorCount);
+    const grew = await waitForCourseAnchorGrowth(page, iteration.courseLikeAnchorCount, opts.throttleMs, logger);
     if (!grew) {
       logger.info('Pagination ended: no additional course anchors found after load more', {
         keyword,
@@ -89,6 +92,7 @@ export async function collectAndRankTopCourses(
     readonly filters: SearchFilters;
     readonly maxCourses: number;
     readonly maxPages: number;
+    readonly throttleMs: number;
   },
   logger: Logger,
   now: Date
@@ -110,7 +114,8 @@ export async function collectAndRankTopCourses(
         courseUrl,
         extractor: 'src/udemy/extractCourseDetail.ts:extractCourseDetail'
       });
-      await gotoWithRetries(page, courseUrl);
+      await sleepMs(900);
+      await gotoWithRetries(page, courseUrl, { operationName: 'openDetailPage', throttleMs: opts.throttleMs, logger });
       logger.info('Opening detail page', { keyword, courseUrl, currentUrl: page.url() });
 
       const extraction = await extractCourseDetail(page, keyword, courseUrl);
@@ -267,7 +272,7 @@ function parseDate(value: string): Date | null {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-async function waitForSearchResultsUi(page: Page): Promise<void> {
+async function waitForSearchResultsUi(page: Page, throttleMs: number, logger: Logger): Promise<void> {
   const preferred = page.locator('[data-purpose*="search-course-card" i] a[href], [data-purpose="search-course-card-title"]');
   const fallback = page.locator('a[href*="/course/"]');
   const deadline = Date.now() + RESULT_WAIT_TIMEOUT_MS;
@@ -276,7 +281,11 @@ async function waitForSearchResultsUi(page: Page): Promise<void> {
     if ((await preferred.count()) > 0 || (await fallback.count()) > 0) {
       return;
     }
-    await page.waitForLoadState('networkidle', { timeout: 1_500 }).catch(() => {});
+    await throttled(() => page.waitForLoadState('networkidle', { timeout: 1_500 }), {
+      operationName: 'waitForSearchResultsUi',
+      throttleMs,
+      logger
+    }).catch(() => {});
   }
 
   await fallback.first().waitFor({ state: 'visible', timeout: 2_000 });
@@ -370,7 +379,7 @@ interface HrefDebugDump {
   readonly courseLikeHrefs: readonly string[];
 }
 
-async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number, logger: Logger): Promise<boolean> {
+async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number, logger: Logger, throttleMs: number): Promise<boolean> {
   const loadMoreCandidates = [
     page.getByRole('button', { name: /load more|show more/i }),
     page.locator('[data-purpose*="load-more" i], [data-purpose*="show-more" i]')
@@ -382,16 +391,18 @@ async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number
       for (let i = 0; i < count; i += 1) {
         const item = candidate.nth(i);
         if (await item.isVisible().catch(() => false) && await item.isEnabled().catch(() => false)) {
-          await item.click({ timeout: 5_000 });
+          await throttled(() => item.click({ timeout: 5_000 }), { operationName: 'loadMoreClick', throttleMs, logger });
+          await sleepMs(800);
           logger.info('Load more action', { keyword, pageIndex, action: 'click' });
           return true;
         }
       }
     }
 
-    await page.evaluate(() => {
+    await throttled(async () => page.evaluate(() => {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'auto' });
-    });
+    }), { operationName: 'loadMoreScroll', throttleMs, logger });
+    await sleepMs(800);
     logger.info('Load more action', { keyword, pageIndex, action: 'scroll' });
     return true;
   } catch (error) {
@@ -401,13 +412,13 @@ async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number
   }
 }
 
-async function waitForCourseAnchorGrowth(page: Page, previousCount: number): Promise<boolean> {
+async function waitForCourseAnchorGrowth(page: Page, previousCount: number, throttleMs: number, logger: Logger): Promise<boolean> {
   try {
-    await page.waitForFunction(
+    await throttled(() => page.waitForFunction(
       (count) => document.querySelectorAll('a[href*="/course/"]').length > count,
       previousCount,
       { timeout: LOAD_MORE_WAIT_TIMEOUT_MS }
-    );
+    ), { operationName: 'waitForCourseAnchorGrowth', throttleMs, logger });
     return true;
   } catch {
     return false;
