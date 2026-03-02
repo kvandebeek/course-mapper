@@ -7,6 +7,8 @@ export interface CliOptions {
   throttleMs: number;
   concurrency: number;
   profileDir: string;
+  keywordsFile?: string;
+  normalizedKeywordsFile?: string;
 }
 
 export type BrowserChannel = 'chrome' | 'msedge' | 'chromium';
@@ -15,6 +17,7 @@ export interface AppConfig {
   baseUrl: string;
   orgHomePath: string;
   inputCsvPath: string;
+  normalizedKeywordsCsvPath: string;
   outputCsvPath: string;
   englishLocales: ReadonlySet<string>;
   minRating: number;

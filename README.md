@@ -3,7 +3,7 @@
 Production-ready Node.js + TypeScript CLI that scrapes the Resillion Udemy Business catalog and exports top 3 eligible courses per keyword to CSV.
 
 ## Overview
-- Reads keyword mappings from `./input/keywords.csv`.
+- Reads source keywords from `./keywords-list.csv` and auto-generates normalized keywords at `./artifacts/keywords.normalized.csv`.
 - Reuses a persisted Playwright browser profile for SSO-authenticated sessions.
 - Uses deterministic URL-driven navigation (`page.goto`) for search and course pages (no UI clicks).
 - Enforces same-tab behavior by closing unexpected tabs/popups.
@@ -15,9 +15,29 @@ Production-ready Node.js + TypeScript CLI that scrapes the Resillion Udemy Busin
    ```bash
    npm install
    ```
-3. Ensure input file exists:
-   - `./input/keywords.csv`
-   - Headers: `track,level,moduleType,keyword`
+3. Ensure source keyword file exists:
+   - `./keywords-list.csv`
+   - Headers: `Track,Level,Core Modules,AI Modules,Softskills`
+   - `Track` can be blank to carry forward the previous row
+   - Module columns contain semicolon-separated keywords
+
+
+## Keyword normalization
+- Normalized keyword file: `./artifacts/keywords.normalized.csv`
+- Normalized schema: `track,level,moduleType,keyword`
+- Module type values: `core`, `ai`, `softskill`
+- During `npm run scrape`, normalization runs automatically when needed:
+  - normalized file missing, or
+  - source keyword file is newer than normalized file
+
+Generate normalized keywords directly:
+```bash
+npm run normalize:keywords
+```
+
+Optional file overrides:
+- `--keywordsFile=<path>` (default: `./keywords-list.csv`)
+- `--normalizedKeywordsFile=<path>` (default: `./artifacts/keywords.normalized.csv`)
 
 ## Authentication workflow (persistent profileDir + manual SSO)
 The scraper launches a persistent browser context using `--profileDir`.
@@ -61,6 +81,8 @@ Final eligibility (from detail extraction):
 - `--throttleMs` (accepted for backward compatibility)
 - `--concurrency` (accepted for backward compatibility)
 - `--profileDir` (default: `./artifacts/profile`)
+- `--keywordsFile` (default: `./keywords-list.csv`)
+- `--normalizedKeywordsFile` (default: `./artifacts/keywords.normalized.csv`)
 
 Use `--help` to print CLI help at runtime.
 
