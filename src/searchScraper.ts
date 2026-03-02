@@ -1,7 +1,10 @@
-import { Page, Response } from 'playwright';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { BrowserContext, Page } from 'playwright';
 import { Logger } from './logger.js';
 import { SearchResultPayload } from './types.js';
-import { withRetry } from './utils/retry.js';
+import { waitForSearchPayload } from './udemy/searchTransport.js';
+import { UnknownRecord, isRecord, tryExtractHits } from './udemy/types.js';
 
 interface SearchParams {
   maxCoursesPerKeyword: number;
@@ -9,8 +12,13 @@ interface SearchParams {
   throttleMs: number;
 }
 
+export interface SearchRuntime {
+  context: BrowserContext;
+  page: Page | null;
+}
+
 export async function scrapeKeywordCourses(
-  page: Page,
+  runtime: SearchRuntime,
   baseUrl: string,
   keyword: string,
   params: SearchParams,
@@ -23,181 +31,186 @@ export async function scrapeKeywordCourses(
       break;
     }
 
-    const query = new URL('/organization/search/', baseUrl);
-    query.searchParams.set('q', keyword);
-    query.searchParams.set('p', String(pageNum));
-    query.searchParams.set('src', 'ukw');
+    const searchUrl = buildSearchUrl(baseUrl, keyword, pageNum);
+    let pageSucceeded = false;
 
-    const captured: SearchResultPayload[] = [];
-    const onResponse = async (response: Response): Promise<void> => {
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const attemptStart = Date.now();
+      const backoffMs = attempt === 2 ? 500 : attempt === 3 ? 1500 : 0;
+      const traceFile = path.join(
+        'artifacts',
+        'debug',
+        sanitizeKeyword(keyword),
+        `page-${pageNum}-attempt-${attempt}.zip`
+      );
+
       try {
-        if (!response.url().includes('/api-2.0')) {
-          return;
+        if (backoffMs > 0) {
+          await delay(backoffMs);
         }
-        const json = (await response.json()) as unknown;
-        const parsed = extractFromApiResponse(json);
-        for (const item of parsed) {
-          captured.push(item);
+
+        runtime.page = await ensurePage(runtime.context, runtime.page);
+        await runtime.context.tracing.start({ screenshots: true, snapshots: true });
+
+        logger.info('Navigating keyword search page', { keyword, pageNum, attempt, url: searchUrl });
+        await runtime.page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+        const match = await waitForSearchPayload(runtime.page, 60000);
+        const hits = tryExtractHits(match.payload) ?? [];
+        const parsed = hits.map(mapHitToSearchPayload).filter((item): item is SearchResultPayload => item !== null);
+
+        for (const entry of parsed) {
+          if (!courseMap.has(entry.id)) {
+            courseMap.set(entry.id, entry);
+          }
         }
-      } catch {
-        // ignore parsing issues for irrelevant responses
-      }
-    };
 
-    page.on('response', onResponse);
+        await runtime.context.tracing.stop();
 
-    await withRetry(
-      async () => {
-        await page.goto(query.toString(), { waitUntil: 'domcontentloaded' });
-        await page.waitForLoadState('networkidle');
-      },
-      2,
-      500,
-      (attempt, error) => {
-        logger.warn('Retrying keyword page load', { keyword, pageNum, attempt, error: String(error) });
-      }
-    );
+        logger.info('Search payload captured', {
+          keyword,
+          pageNum,
+          attempt,
+          responseUrl: match.responseUrl,
+          responseStatus: match.status,
+          extracted: parsed.length,
+          totalUnique: courseMap.size
+        });
 
-    const domExtracted = await extractFromNextData(page);
-    for (const entry of [...captured, ...domExtracted]) {
-      if (!courseMap.has(entry.id)) {
-        courseMap.set(entry.id, entry);
+        pageSucceeded = true;
+        if (parsed.length === 0 && pageNum > 1) {
+          break;
+        }
+        break;
+      } catch (error) {
+        const durationMs = Date.now() - attemptStart;
+        const message = String(error);
+        logger.warn('Keyword page attempt failed', {
+          keyword,
+          pageNum,
+          attempt,
+          durationMs,
+          error: message
+        });
+
+        await captureDiagnostics(runtime.page, keyword, pageNum, attempt, traceFile, logger);
+        await recoverFromPageOrContextClosure(runtime, message, logger);
+
+        if (attempt === 3) {
+          logger.error('Keyword page failed after retries', { keyword, pageNum, durationMs, error: message });
+          break;
+        }
       }
     }
 
-    page.off('response', onResponse);
-
-    logger.debug('Page parsed', { keyword, pageNum, captured: captured.length, totalUnique: courseMap.size });
-
-    if (captured.length === 0 && domExtracted.length === 0 && pageNum > 1) {
-      break;
+    if (!pageSucceeded) {
+      continue;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, params.throttleMs));
+    await delay(params.throttleMs);
   }
 
   return [...courseMap.values()].slice(0, params.maxCoursesPerKeyword);
 }
 
-function extractFromApiResponse(payload: unknown): SearchResultPayload[] {
-  if (!payload || typeof payload !== 'object') {
-    return [];
+export async function ensurePage(context: BrowserContext, page: Page | null): Promise<Page> {
+  if (context.isClosed()) {
+    throw new Error('Browser context is closed');
   }
 
-  const objectPayload = payload as Record<string, unknown>;
-  const results = objectPayload.results;
-  if (!Array.isArray(results)) {
-    return [];
+  if (!page || page.isClosed()) {
+    const nextPage = await context.newPage();
+    nextPage.setDefaultNavigationTimeout(60000);
+    nextPage.setDefaultTimeout(60000);
+    return nextPage;
   }
 
-  const parsed: SearchResultPayload[] = [];
-  for (const row of results) {
-    if (!row || typeof row !== 'object') {
-      continue;
-    }
-    const course = row as Record<string, unknown>;
-    const idValue = course.id;
-    const title = toString(course.title);
-    const url = normalizeUrl(toString(course.url));
-    if (typeof idValue !== 'number' && typeof idValue !== 'string') {
-      continue;
-    }
-    if (!title || !url) {
-      continue;
-    }
-
-    const instructorsArray = Array.isArray(course.visible_instructors)
-      ? (course.visible_instructors as Array<Record<string, unknown>>)
-      : [];
-
-    parsed.push({
-      id: String(idValue),
-      url,
-      title,
-      instructors: instructorsArray
-        .map((ins) => toString(ins.display_name))
-        .filter((name) => name.length > 0)
-        .join('; '),
-      locale: toString((course.locale as Record<string, unknown> | undefined)?.locale) || toString(course.locale_simple),
-      rating: toNumber(course.rating),
-      ratingCount: toNumber(course.num_reviews),
-      level: toString(course.instructional_level_simple) || null
-    });
-  }
-  return parsed;
+  page.setDefaultNavigationTimeout(60000);
+  page.setDefaultTimeout(60000);
+  return page;
 }
 
-async function extractFromNextData(page: Page): Promise<SearchResultPayload[]> {
-  const json = await page.locator('script#__NEXT_DATA__').first().textContent();
-  if (!json) {
-    return [];
+async function recoverFromPageOrContextClosure(runtime: SearchRuntime, errorMessage: string, logger: Logger): Promise<void> {
+  const closedPage = runtime.page?.isClosed() ?? false;
+  const closureError = errorMessage.toLowerCase().includes('context or browser has been closed');
+
+  if (closedPage || closureError) {
+    runtime.page = null;
+    logger.warn('Page closed or invalidated; will recreate for next attempt');
   }
-
-  const data = JSON.parse(json) as Record<string, unknown>;
-  const props = data.props as Record<string, unknown> | undefined;
-  const pageProps = props?.pageProps as Record<string, unknown> | undefined;
-  const initial = pageProps?.initialState as Record<string, unknown> | undefined;
-  const collections = findArrays(initial);
-
-  const matches: SearchResultPayload[] = [];
-  for (const collection of collections) {
-    for (const row of collection) {
-      if (!row || typeof row !== 'object') {
-        continue;
-      }
-      const course = row as Record<string, unknown>;
-      if (!('title' in course) || !('url' in course) || !('id' in course)) {
-        continue;
-      }
-      const id = course.id;
-      if (typeof id !== 'number' && typeof id !== 'string') {
-        continue;
-      }
-      const title = toString(course.title);
-      const url = normalizeUrl(toString(course.url));
-      if (!title || !url) {
-        continue;
-      }
-      matches.push({
-        id: String(id),
-        url,
-        title,
-        instructors: '',
-        locale: toString((course.locale as Record<string, unknown> | undefined)?.locale),
-        rating: toNumber(course.rating),
-        ratingCount: toNumber(course.num_reviews),
-        level: toString(course.instructional_level_simple) || null
-      });
-    }
-  }
-
-  return matches;
 }
 
-function findArrays(input: unknown): Array<Array<unknown>> {
-  if (!input || typeof input !== 'object') {
-    return [];
-  }
-  const arrays: Array<Array<unknown>> = [];
-  const stack: unknown[] = [input];
+async function captureDiagnostics(
+  page: Page | null,
+  keyword: string,
+  pageNum: number,
+  attempt: number,
+  traceFile: string,
+  logger: Logger
+): Promise<void> {
+  const debugDir = path.join('artifacts', 'debug', sanitizeKeyword(keyword));
+  await fs.mkdir(debugDir, { recursive: true });
 
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current || typeof current !== 'object') {
-      continue;
+  try {
+    if (page && !page.isClosed()) {
+      const screenshotPath = path.join(debugDir, `page-${pageNum}-attempt-${attempt}.png`);
+      await page.screenshot({ path: screenshotPath, fullPage: true });
     }
-
-    if (Array.isArray(current)) {
-      arrays.push(current);
-      continue;
-    }
-
-    for (const value of Object.values(current as Record<string, unknown>)) {
-      stack.push(value);
-    }
+  } catch (error) {
+    logger.warn('Unable to capture screenshot', { keyword, pageNum, attempt, error: String(error) });
   }
 
-  return arrays;
+  try {
+    await page?.context().tracing.stop({ path: traceFile });
+  } catch (error) {
+    logger.warn('Unable to write trace', { keyword, pageNum, attempt, error: String(error) });
+  }
+}
+
+function buildSearchUrl(baseUrl: string, keyword: string, pageNum: number): string {
+  const query = new URL('/organization/search/', baseUrl);
+  query.searchParams.set('q', keyword);
+  query.searchParams.set('p', String(pageNum));
+  query.searchParams.set('src', 'ukw');
+  return query.toString();
+}
+
+function mapHitToSearchPayload(course: UnknownRecord): SearchResultPayload | null {
+  const idValue = course.id;
+  const title = toString(course.title);
+  const url = normalizeUrl(toString(course.url));
+
+  if ((typeof idValue !== 'string' && typeof idValue !== 'number') || !title || !url) {
+    return null;
+  }
+
+  const instructorsArray = Array.isArray(course.visible_instructors)
+    ? course.visible_instructors.filter(isRecord)
+    : [];
+
+  const locale = isRecord(course.locale) ? toString(course.locale.locale) : '';
+
+  return {
+    id: String(idValue),
+    url,
+    title,
+    instructors: instructorsArray
+      .map((ins) => toString(ins.display_name))
+      .filter((name) => name.length > 0)
+      .join('; '),
+    locale: locale || toString(course.locale_simple),
+    rating: toNumber(course.rating),
+    ratingCount: toNumber(course.num_reviews),
+    level: toString(course.instructional_level_simple) || null
+  };
+}
+
+function sanitizeKeyword(keyword: string): string {
+  return keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'keyword';
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function toString(value: unknown): string {
