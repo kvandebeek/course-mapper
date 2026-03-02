@@ -2,69 +2,58 @@ import { getAppConfig, getCliOptions, resolvePath } from './config.js';
 import { createLogger } from './logger.js';
 import { loadKeywords } from './keywordLoader.js';
 import { initAuthenticatedSession } from './auth.js';
-import { scrapeKeywordCourses, SearchRuntime } from './searchScraper.js';
+import { scrapeKeywordCourses } from './searchScraper.js';
 import { enrichCourses } from './courseEnricher.js';
 import { filterCourses } from './filter.js';
 import { scoreAndSelectTopThree } from './scoring.js';
 import { writeOutputCsv } from './csvWriter.js';
 import { CourseScored } from './types.js';
+import { createSessionManager } from './runtime/sessionManager.js';
 
 async function main(): Promise<void> {
   const cli = getCliOptions(process.argv);
   const config = getAppConfig();
   const logger = createLogger(cli.debug);
   const totalStart = Date.now();
+  const sessionManager = createSessionManager({
+    profileDir: cli.profileDir,
+    headless: cli.headless,
+    logger
+  });
 
   logger.info('Starting scraper', { cli });
 
   const keywords = await loadKeywords(resolvePath(config.inputCsvPath));
   logger.info('Loaded keywords', { count: keywords.length });
 
-  const initialSession = await initAuthenticatedSession(
-    cli.profileDir,
+  let session = await initAuthenticatedSession(
+    sessionManager,
     config.baseUrl,
     config.orgHomePath,
     cli.headless,
     logger
   );
 
-  const runtime: SearchRuntime = {
-    context: initialSession.context,
-    page: initialSession.page
-  };
-
   const finalRows: CourseScored[] = [];
 
   for (const keywordRow of keywords) {
     const start = Date.now();
     try {
-      logger.info('Processing keyword', { keyword: keywordRow.keyword });
+      logger.info('Keyword processing started', { keyword: keywordRow.keyword });
+      session = await sessionManager.getOrCreateSession();
 
-      if (runtime.context.isClosed()) {
-        logger.warn('Search context was closed; recreating authenticated session');
-        const replacement = await initAuthenticatedSession(
-          cli.profileDir,
-          config.baseUrl,
-          config.orgHomePath,
-          cli.headless,
-          logger
-        );
-        runtime.context = replacement.context;
-        runtime.page = replacement.page;
-      }
-
-      const searchResults = await scrapeKeywordCourses(runtime, config.baseUrl, keywordRow.keyword, {
+      const searchResults = await scrapeKeywordCourses(session, config.baseUrl, keywordRow.keyword, {
         maxCoursesPerKeyword: cli.maxCoursesPerKeyword,
         maxPages: cli.maxPages,
         throttleMs: cli.throttleMs
       }, logger);
 
-      const enriched = await enrichCourses(runtime.context, keywordRow.keyword, searchResults, cli.concurrency, logger);
+      const enriched = await enrichCourses(session.context, keywordRow.keyword, searchResults, cli.concurrency, logger);
       const filtered = filterCourses(enriched, config);
       const topThree = scoreAndSelectTopThree(filtered, keywordRow);
       finalRows.push(...topThree);
 
-      logger.info('Keyword complete', {
+      logger.info('Keyword processing completed', {
         keyword: keywordRow.keyword,
         fetched: searchResults.length,
         filtered: filtered.length,
@@ -78,17 +67,18 @@ async function main(): Promise<void> {
         error: String(error)
       });
 
-      if (String(error).toLowerCase().includes('context') || runtime.context.isClosed()) {
+      const shouldRecreate = String(error).toLowerCase().includes('context') || session.isClosed();
+      if (shouldRecreate) {
+        logger.warn('Keyword failure triggered session recreation', { keyword: keywordRow.keyword });
         try {
-          const replacement = await initAuthenticatedSession(
-            cli.profileDir,
+          await sessionManager.closeSession();
+          session = await initAuthenticatedSession(
+            sessionManager,
             config.baseUrl,
             config.orgHomePath,
             cli.headless,
             logger
           );
-          runtime.context = replacement.context;
-          runtime.page = replacement.page;
           logger.info('Session recreated after keyword failure');
         } catch (recreateError) {
           logger.error('Failed to recreate session', { error: String(recreateError) });
@@ -108,8 +98,8 @@ async function main(): Promise<void> {
     totalDurationMs: Date.now() - totalStart
   });
 
-  if (!cli.debug && !runtime.context.isClosed()) {
-    await runtime.context.close();
+  if (!cli.debug) {
+    await sessionManager.closeSession();
   }
 }
 
