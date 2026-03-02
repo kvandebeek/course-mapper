@@ -2,13 +2,11 @@ import { getAppConfig, getCliOptions, resolvePath } from './config.js';
 import { createLogger } from './logger.js';
 import { loadKeywords } from './keywordLoader.js';
 import { initAuthenticatedSession } from './auth.js';
-import { scrapeKeywordCourses } from './searchScraper.js';
-import { enrichCourses } from './courseEnricher.js';
-import { filterCourses } from './filter.js';
-import { scoreAndSelectTopThree } from './scoring.js';
 import { writeOutputCsv } from './csvWriter.js';
-import { CourseScored } from './types.js';
+import { CourseCsvRow } from './types.js';
 import { createSessionManager } from './runtime/sessionManager.js';
+import { DEFAULT_FILTERS, collectAndRankTopCourses } from './udemy/scrapeKeyword.js';
+import { enforceSameTabNavigation } from './udemy/navigation.js';
 
 function printHelp(): void {
   console.log(`Udemy Business scraper options:
@@ -44,60 +42,51 @@ async function main(): Promise<void> {
   logger.info('Loaded keywords', { count: keywords.length });
 
   let session = await initAuthenticatedSession(sessionManager, config.baseUrl, config.orgHomePath, cli.headless, logger);
+  const page = await session.ensurePage();
+  enforceSameTabNavigation(session.context, page);
 
-  const finalRows: CourseScored[] = [];
+  const finalRows: CourseCsvRow[] = [];
 
   for (const keywordRow of keywords) {
     const start = Date.now();
-    try {
-      logger.info('Keyword processing started', { keyword: keywordRow.keyword });
-      session = await sessionManager.getOrCreateSession();
+    logger.info('Keyword processing started', { keyword: keywordRow.keyword });
 
-      const scrapeResult = await scrapeKeywordCourses(
-        session,
-        config.baseUrl,
+    try {
+      session = await sessionManager.getOrCreateSession();
+      const runtimePage = await session.ensurePage();
+      enforceSameTabNavigation(session.context, runtimePage);
+
+      const topCourses = await collectAndRankTopCourses(
+        runtimePage,
         keywordRow.keyword,
         {
-          maxCoursesPerKeyword: cli.maxCoursesPerKeyword,
-          maxPages: cli.maxPages,
-          throttleMs: cli.throttleMs
+          filters: DEFAULT_FILTERS,
+          maxCourses: Math.min(cli.maxCoursesPerKeyword, 200),
+          maxPages: cli.maxPages
         },
-        logger
+        logger,
+        new Date()
       );
 
-      const enriched = await enrichCourses(session.context, keywordRow.keyword, [...scrapeResult.courses], cli.concurrency, logger);
-      const filtered = filterCourses(enriched, config);
-      const topThree = scoreAndSelectTopThree(filtered, keywordRow);
-      if (topThree.length === 0 && scrapeResult.failureReason) {
-        finalRows.push({
-          track: keywordRow.track,
-          level: keywordRow.level,
-          moduleType: keywordRow.moduleType,
+      finalRows.push(
+        ...topCourses.map((course) => ({
           keyword: keywordRow.keyword,
-          courseId: '',
-          url: '',
-          title: '',
-          instructors: '',
-          language: '',
-          durationMinutes: null,
-          udemyLevel: null,
-          category: null,
-          rating: null,
-          ratingCount: null,
-          lastUpdated: null,
-          score: 0,
-          badges: [],
-          failureReason: scrapeResult.failureReason
-        });
-      }
-      finalRows.push(...topThree);
+          courseTitle: course.title,
+          courseUrl: course.url,
+          rating: course.rating,
+          ratingCount: course.ratingCount,
+          lastUpdateDate: course.lastUpdateDate,
+          publishedDate: course.publishedDate,
+          instructors: course.instructors.join(' | '),
+          courseId: course.courseId
+        }))
+      );
 
       logger.info('Keyword processing completed', {
         keyword: keywordRow.keyword,
-        fetched: scrapeResult.courses.length,
-        filtered: filtered.length,
-        exported: topThree.length,
-        failureReason: scrapeResult.failureReason,
+        visitedDetailPages: topCourses.length,
+        eligibleCount: topCourses.length,
+        exported: topCourses.length,
         durationMs: Date.now() - start
       });
     } catch (error) {
@@ -106,22 +95,6 @@ async function main(): Promise<void> {
         durationMs: Date.now() - start,
         error: String(error)
       });
-
-      const shouldRecreate = String(error).toLowerCase().includes('context') || session.isClosed();
-      if (shouldRecreate) {
-        logger.warn('Keyword failure triggered session recreation', { keyword: keywordRow.keyword });
-        try {
-          await sessionManager.closeSession();
-          session = await initAuthenticatedSession(sessionManager, config.baseUrl, config.orgHomePath, cli.headless, logger);
-          logger.info('Session recreated after keyword failure');
-        } catch (recreateError) {
-          logger.error('Failed to recreate session', { error: String(recreateError) });
-        }
-      }
-
-      if (cli.debug) {
-        logger.debug('Failure details', { stack: error instanceof Error ? error.stack : String(error) });
-      }
     }
   }
 
