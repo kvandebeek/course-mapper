@@ -138,12 +138,15 @@ export async function collectAndRankTopCourses(
         courseId: detail.courseId,
         title: detail.title
       });
-      const eligibility = isCourseEligible(detail);
+      const eligibility = computeEligibility({
+        rating: detail.rating,
+        ratingCount: detail.ratingCount
+      });
 
       logger.info('Computed filters', {
         keyword,
         courseUrl,
-        eligible: eligibility.ok,
+        eligible: eligibility.eligible,
         reason: eligibility.reason,
         rating: detail.rating,
         ratingCount: detail.ratingCount
@@ -156,16 +159,18 @@ export async function collectAndRankTopCourses(
         title: detail.title,
         rating: detail.rating,
         ratingCount: detail.ratingCount,
-        eligible: eligibility.ok,
+        eligible: eligibility.eligible,
         reason: eligibility.reason
       });
 
-      if (eligibility.ok) {
+      if (eligibility.eligible) {
         logger.info('Course accepted', { keyword, courseUrl, courseId: detail.courseId, title: detail.title });
         details.push(detail);
       } else {
         logger.info('Course rejected', { keyword, courseUrl, reason: eligibility.reason });
-        rejectionCounts.set(eligibility.reason, (rejectionCounts.get(eligibility.reason) ?? 0) + 1);
+        if (eligibility.reason !== null) {
+          rejectionCounts.set(eligibility.reason, (rejectionCounts.get(eligibility.reason) ?? 0) + 1);
+        }
       }
     } catch (error) {
       rejectionCounts.set('detail extraction failed', (rejectionCounts.get('detail extraction failed') ?? 0) + 1);
@@ -186,15 +191,29 @@ export async function collectAndRankTopCourses(
   return rankCourses(details).slice(0, 3);
 }
 
-export function isCourseEligible(detail: CourseDetail): { readonly ok: boolean; readonly reason: string } {
-  if (detail.rating === null || detail.rating < 4.4) {
-    return { ok: false, reason: 'rating_below_min' };
-  }
-  if (detail.ratingCount === null || detail.ratingCount < 1500) {
-    return { ok: false, reason: 'rating_count_below_min' };
+export type FailureReason = 'rating_below_min' | 'rating_count_below_min';
+
+export type Eligibility = Readonly<{
+  eligible: boolean;
+  reason: FailureReason | null;
+}>;
+
+export function computeEligibility(input: Readonly<{ rating: number | null; ratingCount: number | null }>): Eligibility {
+  const minRating = 4.5;
+  const minRatingCount = 1500;
+
+  const rating = input.rating ?? 0;
+  const ratingCount = input.ratingCount ?? 0;
+
+  if (rating < minRating) {
+    return { eligible: false, reason: 'rating_below_min' };
   }
 
-  return { ok: true, reason: 'eligible' };
+  if (ratingCount < minRatingCount) {
+    return { eligible: false, reason: 'rating_count_below_min' };
+  }
+
+  return { eligible: true, reason: null };
 }
 
 function rankCourses(courses: readonly CourseDetail[]): CourseDetail[] {
