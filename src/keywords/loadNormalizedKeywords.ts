@@ -11,7 +11,7 @@ interface RawNormalizedRow {
 }
 
 function isModuleType(value: string): value is ModuleType {
-  return value === 'core' || value === 'ai' || value === 'softskill';
+  return value === 'core' || value === 'ai' || value === 'softskills';
 }
 
 export async function loadNormalizedKeywords(normalizedFile: string): Promise<readonly NormalizedKeywordRow[]> {

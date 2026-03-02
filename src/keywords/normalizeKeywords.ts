@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { parse as parseCsv } from 'csv-parse/sync';
 import { stringify as stringifyCsv } from 'csv-stringify/sync';
 
-export type ModuleType = 'core' | 'ai' | 'softskill';
+export type ModuleType = 'core' | 'ai' | 'softskills';
 
 export interface NormalizedKeywordRow {
   readonly track: string;
@@ -28,7 +28,7 @@ interface NormalizeKeywordsFileParams {
 const MODULE_FIELDS: readonly { readonly field: keyof SourceKeywordCsvRow; readonly moduleType: ModuleType }[] = [
   { field: 'Core Modules', moduleType: 'core' },
   { field: 'AI Modules', moduleType: 'ai' },
-  { field: 'Softskills', moduleType: 'softskill' }
+  { field: 'Softskills', moduleType: 'softskills' }
 ];
 
 function hasExpectedHeaders(rows: readonly SourceKeywordCsvRow[]): boolean {
@@ -68,14 +68,32 @@ function parseSourceRows(content: string): readonly SourceKeywordCsvRow[] {
   }) as SourceKeywordCsvRow[];
 }
 
-function splitKeywords(value: string | undefined): readonly string[] {
+/**
+ * Example: "Introduction to Testing, Test Case Design" becomes
+ * ["Introduction to Testing", "Test Case Design"] so each keyword is processed independently.
+ */
+export function splitAndCleanKeywordCell(value: string | undefined): readonly string[] {
   if (!value) {
     return [];
   }
+
   return value
-    .split(';')
-    .map((entry) => entry.trim())
+    .split(',')
+    .map((entry) => entry.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim())
     .filter((entry) => entry.length > 0);
+}
+
+function compareNormalizedRows(a: NormalizedKeywordRow, b: NormalizedKeywordRow): number {
+  if (a.track !== b.track) {
+    return a.track.localeCompare(b.track);
+  }
+  if (a.level !== b.level) {
+    return a.level.localeCompare(b.level);
+  }
+  if (a.moduleType !== b.moduleType) {
+    return a.moduleType.localeCompare(b.moduleType);
+  }
+  return a.keyword.localeCompare(b.keyword);
 }
 
 export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): readonly NormalizedKeywordRow[] {
@@ -92,7 +110,7 @@ export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): reado
     const level = (row.Level ?? '').trim();
 
     for (const moduleConfig of MODULE_FIELDS) {
-      const values = splitKeywords(row[moduleConfig.field]);
+      const values = splitAndCleanKeywordCell(row[moduleConfig.field]);
       for (const keyword of values) {
         const key = `${currentTrack}\u001f${level}\u001f${moduleConfig.moduleType}\u001f${keyword}`;
         if (seen.has(key)) {
@@ -109,7 +127,7 @@ export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): reado
     }
   }
 
-  return normalized;
+  return normalized.sort(compareNormalizedRows);
 }
 
 export function normalizeKeywordsFromString(content: string): readonly NormalizedKeywordRow[] {
