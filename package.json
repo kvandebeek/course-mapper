@@ -8,7 +8,9 @@
     "build": "tsc -p tsconfig.json",
     "scrape": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "smoke": "tsx src/smoke.ts"
+    "smoke": "tsx src/smoke.ts",
+    "test": "tsx --test src/tests/**/*.test.ts",
+    "lint": "tsc --noEmit -p tsconfig.json"
   },
   "engines": {
     "node": ">=20.11.0"

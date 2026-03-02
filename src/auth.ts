@@ -1,4 +1,4 @@
-import readline from 'node:readline/promises';
+import * as readline from 'node:readline/promises';
 import { Logger } from './logger.js';
 import { RuntimeSession } from './runtime/session.js';
 import { SessionManager } from './runtime/sessionManager.js';

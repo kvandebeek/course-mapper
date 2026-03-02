@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import * as path from 'node:path';
 import { stringify } from 'csv-stringify/sync';
 import { CourseScored } from './types.js';
 
-export async function writeOutputCsv(outputPath: string, rows: CourseScored[]): Promise<void> {
+export async function writeOutputCsv(outputPath: string, rows: readonly CourseScored[]): Promise<void> {
   await mkdir(path.dirname(outputPath), { recursive: true });
 
   const payload = rows.map((row) => ({
@@ -22,7 +22,9 @@ export async function writeOutputCsv(outputPath: string, rows: CourseScored[]): 
     rating: row.rating ?? '',
     ratingCount: row.ratingCount ?? '',
     lastUpdated: row.lastUpdated ?? '',
-    score: row.score
+    score: row.score,
+    status: row.failureReason ? 'failed' : 'ok',
+    failureReason: row.failureReason ?? ''
   }));
 
   const csv = stringify(payload, {
@@ -43,7 +45,9 @@ export async function writeOutputCsv(outputPath: string, rows: CourseScored[]): 
       'rating',
       'ratingCount',
       'lastUpdated',
-      'score'
+      'score',
+      'status',
+      'failureReason'
     ]
   });
 

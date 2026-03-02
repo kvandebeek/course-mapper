@@ -5,7 +5,8 @@ Production-ready Node.js + TypeScript CLI that scrapes the Resillion Udemy Busin
 ## Overview
 - Reads keyword mappings from `./input/keywords.csv`.
 - Reuses a persisted Playwright browser profile for SSO-authenticated sessions.
-- Scrapes search results, enriches each course from Udemy API responses, filters courses, scores them, and writes top 3 per keyword.
+- Uses Playwright `chromium` with `channel=chrome` by default to match a real Chrome runtime used by normal browsing.
+- Scrapes search results with API sniffing, resilient response waits, and DOM fallback extraction.
 - Output CSV: `./artifacts/udemy/top_courses.csv`
 
 ## Setup
@@ -21,93 +22,65 @@ Production-ready Node.js + TypeScript CLI that scrapes the Resillion Udemy Busin
 ## First run (manual SSO, headed)
 Use headed mode and complete SSO in the opened browser profile:
 ```bash
-npm run scrape -- --headless=false --profileDir=./artifacts/profile
+npm run scrape -- --headless=false --profileDir=./artifacts/profile --browserChannel=chrome
 ```
 If not authenticated, the CLI pauses and asks you to press ENTER after login succeeds.
 
-## Subsequent runs (headless)
-Once the profile is persisted:
+## Recommended run flags
 ```bash
-npm run scrape -- --headless=true --profileDir=./artifacts/profile
+npm run scrape -- --headless=true --browserChannel=chrome --concurrency=1 --throttleMs=900 --maxPages=8
 ```
+Recommended defaults for Udemy Business stability:
+- `--browserChannel=chrome`
+- `--concurrency=1`
+- `--throttleMs` >= `700`
+- conservative `--maxPages`
 
 ## CLI flags
 - `--headless` (default: `false`)
 - `--debug` (default: `false`)
+- `--browserChannel` (default: `chrome`, allowed: `chrome|msedge|chromium`)
 - `--maxCoursesPerKeyword` (default: `200`)
 - `--maxPages` (default: `15`)
-- `--throttleMs` (default: `300`)
-- `--concurrency` (default: `2`, capped at 2)
+- `--throttleMs` (default: `300`, plus built-in jitter 400-1200ms)
+- `--concurrency` (default: `1`)
 - `--profileDir` (default: `./artifacts/profile`)
 
-Example:
-```bash
-npm run scrape -- --headless=true --maxPages=20 --throttleMs=400 --concurrency=2
-```
+Use `--help` to print CLI help at runtime.
 
-## Filtering rules
-A course is included only if:
-- Locale is English (`en`, `en_US`, `en_GB`)
-- `rating >= 4.4`
-- `ratingCount >= 1500`
-- `lastUpdated` exists and is within the last 36 months (Europe/Brussels reference timezone)
-
-## Scoring
-For each remaining course:
-
-```text
-score = rating * 10 + log10(ratingCount + 1) * 5 + freshnessBonus
-```
-
-Freshness bonus:
-- `+5` if updated within 12 months
-- `+3` if within 24 months
-- `+1` if within 36 months
-
-Top 3 by score are kept per keyword.
-
-## Input CSV format
-`./input/keywords.csv`
-
-Required columns:
-- `track`
-- `level`
-- `moduleType`
-- `keyword`
-
-Each keyword row is applied to all exported courses found for that keyword.
+## Search resilience behavior
+- Detects the UI error state `search is currently unavailable`.
+- Retries page reload up to 3 times using exponential backoff + jitter.
+- If still unavailable, skips the keyword gracefully and records `status=failed` + `failureReason` in CSV output.
+- Stops pagination when unique result count does not increase.
+- Uses network endpoint sniffing to avoid non-result endpoints (for example, `learning_path_folder` tags).
+- Falls back to DOM extraction if API capture fails.
 
 ## Output CSV format
 `./artifacts/udemy/top_courses.csv`
 
 Columns:
-- `track,level,moduleType,keyword,courseId,url,title,instructors,language,durationMinutes,udemyLevel,category,rating,ratingCount,lastUpdated,score`
+- `track,level,moduleType,keyword,courseId,url,title,instructors,language,durationMinutes,udemyLevel,category,rating,ratingCount,lastUpdated,score,status,failureReason`
 
-## Determinism and resilience
-- Uses explicit page load states (`domcontentloaded`, `networkidle`) rather than arbitrary sleeps for navigation.
-- Uses bounded retries (max 2) for transient failures.
-- Throttles between pages (`--throttleMs`).
-- Continues per-keyword on failures; one keyword failure will not abort the run.
-- Structured logs include timings per keyword and run total.
-
-
-## Session lifecycle
-- Runtime uses a `RuntimeSession` abstraction to track context close and browser disconnect events without calling `BrowserContext.isClosed()` (not available in Playwright).
-- A single `getOrCreateSession()` path reuses healthy persistent sessions and recreates closed/disconnected ones with an in-process creation lock.
-- Manual SSO behavior remains deterministic: headed login waits for ENTER and does not auto-close your profile mid-run.
+## Troubleshooting
+- **“Sorry, search is currently unavailable” appears**:
+  - Likely rate limiting or anti-bot fingerprinting.
+  - Run slower (`--concurrency=1`, higher `--throttleMs`, lower `--maxPages`).
+  - Prefer `--browserChannel=chrome`.
+  - Retry with a fresh profile directory and re-run SSO.
+- **Chrome channel is missing**:
+  - Install Chrome (or use `--browserChannel=msedge`).
+  - Scraper logs a warning and falls back to Playwright Chromium automatically.
+- **Login keeps failing in headless mode**:
+  - run with `--headless=false` and complete SSO manually once.
+- **Empty results**:
+  - verify keyword relevance, account access, and that filters are not excluding all courses.
 
 ## Smoke check
-Run a lightweight lifecycle smoke check:
+Run lifecycle smoke check:
 ```bash
 npm run smoke
 ```
-This validates create -> reuse -> close -> recreate flow for persistent sessions.
-
-## Troubleshooting
-- **Login keeps failing in headless mode**: run with `--headless=false` and complete SSO manually once.
-- **Empty results**: verify keyword relevance, account access, and that filters are not excluding all courses.
-- **Rate limiting / unstable pages**: increase `--throttleMs` and reduce `--maxPages`.
-- **Profile corruption**: delete `./artifacts/profile` and repeat first-run login.
 
 ## Compliance note
 Use responsibly. Respect Udemy Business terms of use, organizational policies, and platform rate limits.

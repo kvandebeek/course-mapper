@@ -7,6 +7,7 @@ async function main(): Promise<void> {
   const headless = process.env.SMOKE_HEADLESS !== 'false';
 
   const manager = createSessionManager({
+    browserChannel: "chrome",
     profileDir,
     headless,
     logger
