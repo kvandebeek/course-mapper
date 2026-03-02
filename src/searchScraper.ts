@@ -1,16 +1,80 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { Page } from 'playwright';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { Page, Response } from 'playwright';
 import { Logger } from './logger.js';
 import { RuntimeSession } from './runtime/session.js';
 import { SearchResultPayload } from './types.js';
-import { waitForSearchPayload } from './udemy/searchTransport.js';
+import {
+  buildResponsePredicate,
+  safeJson,
+  sniffSearchResultsEndpoint,
+  summarizeCandidates,
+  waitForResponseOrClose
+} from './udemy/searchTransport.js';
 import { UnknownRecord, isRecord, tryExtractHits } from './udemy/types.js';
 
 interface SearchParams {
-  maxCoursesPerKeyword: number;
-  maxPages: number;
-  throttleMs: number;
+  readonly maxCoursesPerKeyword: number;
+  readonly maxPages: number;
+  readonly throttleMs: number;
+}
+
+interface KeywordFailure {
+  readonly reason: string;
+}
+
+export interface ScrapeKeywordResult {
+  readonly courses: readonly SearchResultPayload[];
+  readonly failureReason?: string;
+}
+
+export function shouldStopPagination(previousUniqueTotal: number, newUniqueTotal: number): boolean {
+  return newUniqueTotal - previousUniqueTotal <= 0;
+}
+
+export async function sleepWithJitter(baseMs: number, jitterMinMs: number, jitterMaxMs: number): Promise<void> {
+  const jitterSpan = Math.max(0, jitterMaxMs - jitterMinMs);
+  const randomInt = jitterSpan === 0 ? 0 : crypto.randomInt(0, jitterSpan + 1);
+  const delayMs = Math.max(0, baseMs + jitterMinMs + randomInt);
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+export async function isSearchUnavailable(page: Page): Promise<boolean> {
+  const bodyText = await page.locator('body').innerText().catch(() => '');
+  return bodyText.toLowerCase().includes('search is currently unavailable');
+}
+
+export async function extractCoursesFromDom(page: Page): Promise<readonly SearchResultPayload[]> {
+  const cards = page.locator('[data-testid="course-card-title"], [data-purpose="search-course-card-title"]');
+  const count = await cards.count();
+  const found: SearchResultPayload[] = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const titleNode = cards.nth(index);
+    const title = (await titleNode.innerText().catch(() => '')).trim();
+    const href = await titleNode.getAttribute('href').catch(() => null);
+    const card = titleNode.locator('xpath=ancestor::a[1]');
+    const absoluteHref = href ?? (await card.getAttribute('href').catch(() => null));
+    if (!title || !absoluteHref) {
+      continue;
+    }
+
+    const normalizedUrl = normalizeUrl(absoluteHref);
+    const id = normalizedUrl.split('/course/')[1]?.split('/')[0] ?? normalizedUrl;
+    found.push({
+      id,
+      title,
+      url: normalizedUrl,
+      instructors: '',
+      locale: '',
+      rating: null,
+      ratingCount: null,
+      level: null
+    });
+  }
+
+  return found;
 }
 
 export async function scrapeKeywordCourses(
@@ -19,8 +83,11 @@ export async function scrapeKeywordCourses(
   keyword: string,
   params: SearchParams,
   logger: Logger
-): Promise<SearchResultPayload[]> {
+): Promise<ScrapeKeywordResult> {
   const courseMap = new Map<string, SearchResultPayload>();
+  let previousUniqueTotal = 0;
+  let sniffedCandidates: readonly string[] = [];
+  let failure: KeywordFailure | undefined;
 
   for (let pageNum = 1; pageNum <= params.maxPages; pageNum += 1) {
     if (courseMap.size >= params.maxCoursesPerKeyword) {
@@ -32,81 +99,150 @@ export async function scrapeKeywordCourses(
 
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       const attemptStart = Date.now();
-      const backoffMs = attempt === 2 ? 500 : attempt === 3 ? 1500 : 0;
-      const traceFile = path.join(
-        'artifacts',
-        'debug',
-        sanitizeKeyword(keyword),
-        `page-${pageNum}-attempt-${attempt}.zip`
-      );
+      const traceFile = path.join('artifacts', 'debug', sanitizeKeyword(keyword), `page-${pageNum}-attempt-${attempt}.zip`);
 
       try {
-        if (backoffMs > 0) {
-          await delay(backoffMs);
-        }
-
         const page = await session.ensurePage();
-        await session.context.tracing.start({ screenshots: true, snapshots: true });
+        attachPageObservers(page, keyword, pageNum, logger);
 
+        await session.context.tracing.start({ screenshots: true, snapshots: true });
         logger.info('Navigating keyword search page', { keyword, pageNum, attempt, url: searchUrl });
         await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-        const match = await waitForSearchPayload(page, 60000);
-        const hits = tryExtractHits(match.payload) ?? [];
-        const parsed = hits.map(mapHitToSearchPayload).filter((item): item is SearchResultPayload => item !== null);
+        const recovered = await recoverUnavailableSearch(page, keyword, pageNum, logger);
+        if (!recovered) {
+          failure = { reason: 'search_unavailable' };
+          await session.context.tracing.stop();
+          pageSucceeded = false;
+          break;
+        }
 
-        for (const entry of parsed) {
+        if (pageNum === 1 && sniffedCandidates.length === 0) {
+          sniffedCandidates = await sniffSearchResultsEndpoint(page, 1500);
+          logger.info('Search endpoint candidates sniffed', {
+            keyword,
+            pageNum,
+            candidates: summarizeCandidates(sniffedCandidates)
+          });
+        }
+
+        const apiEntries = await extractViaApiOrDom(page, pageNum, sniffedCandidates, logger, keyword);
+        for (const entry of apiEntries) {
           if (!courseMap.has(entry.id)) {
             courseMap.set(entry.id, entry);
           }
         }
 
+        const newUniqueTotal = courseMap.size;
         await session.context.tracing.stop();
 
-        logger.info('Search payload captured', {
+        logger.info('Search page extracted', {
           keyword,
           pageNum,
           attempt,
-          responseUrl: match.responseUrl,
-          responseStatus: match.status,
-          extracted: parsed.length,
-          totalUnique: courseMap.size
+          extracted: apiEntries.length,
+          totalUnique: newUniqueTotal
         });
 
-        pageSucceeded = true;
-        if (parsed.length === 0 && pageNum > 1) {
-          break;
+        if (shouldStopPagination(previousUniqueTotal, newUniqueTotal) && pageNum > 1) {
+          logger.info('No new unique results; stopping pagination', { keyword, pageNum, uniqueTotal: newUniqueTotal });
+          const courses = [...courseMap.values()].slice(0, params.maxCoursesPerKeyword);
+          return failure ? { courses, failureReason: failure.reason } : { courses };
         }
+
+        previousUniqueTotal = newUniqueTotal;
+        pageSucceeded = true;
         break;
       } catch (error) {
         const durationMs = Date.now() - attemptStart;
         const message = String(error);
-        logger.warn('Keyword page attempt failed', {
-          keyword,
-          pageNum,
-          attempt,
-          durationMs,
-          error: message
-        });
-
+        logger.warn('Keyword page attempt failed', { keyword, pageNum, attempt, durationMs, error: message });
         await captureDiagnostics(session.page, keyword, pageNum, attempt, traceFile, logger);
         await recoverFromPageOrContextClosure(session.page, message, logger);
 
         if (attempt === 3) {
+          failure = { reason: 'page_attempt_failed' };
           logger.error('Keyword page failed after retries', { keyword, pageNum, durationMs, error: message });
-          break;
         }
       }
     }
 
     if (!pageSucceeded) {
-      continue;
+      break;
     }
 
-    await delay(params.throttleMs);
+    await sleepWithJitter(params.throttleMs, 400, 1200);
   }
 
-  return [...courseMap.values()].slice(0, params.maxCoursesPerKeyword);
+  const courses = [...courseMap.values()].slice(0, params.maxCoursesPerKeyword);
+  return failure ? { courses, failureReason: failure.reason } : { courses };
+}
+
+async function extractViaApiOrDom(
+  page: Page,
+  pageNum: number,
+  sniffedCandidates: readonly string[],
+  logger: Logger,
+  keyword: string
+): Promise<readonly SearchResultPayload[]> {
+  if (sniffedCandidates.length > 0) {
+    const response = await waitForResponseOrClose(page, buildResponsePredicate(sniffedCandidates, pageNum), 15000);
+    if (response) {
+      logBadStatus(response, logger, keyword, pageNum);
+      const payload = await safeJson(response);
+      const hits = payload ? tryExtractHits(payload) : undefined;
+      if (hits && hits.length > 0) {
+        return hits.map(mapHitToSearchPayload).filter((item): item is SearchResultPayload => item !== null);
+      }
+    }
+  }
+
+  logger.warn('API response capture failed; using DOM fallback', { keyword, pageNum });
+  return extractCoursesFromDom(page);
+}
+
+function logBadStatus(response: Response, logger: Logger, keyword: string, pageNum: number): void {
+  const status = response.status();
+  if (status === 401 || status === 403 || status === 429 || status >= 500) {
+    const hint = status === 429 ? 'rate limited' : status === 403 ? 'forbidden' : status === 401 ? 'unauthorized' : 'server failure';
+    logger.warn('Candidate API returned warning status', { keyword, pageNum, url: response.url(), status, hint });
+  }
+}
+
+function attachPageObservers(page: Page, keyword: string, pageNum: number, logger: Logger): void {
+  page.removeAllListeners('console');
+  page.removeAllListeners('pageerror');
+
+  page.on('console', (message) => {
+    const location = message.location().url;
+    if (message.type() === 'error') {
+      logger.debug('Page console error', { keyword, pageNum, location, text: message.text() });
+    }
+  });
+
+  page.on('pageerror', (error) => {
+    logger.warn('Page runtime error', { keyword, pageNum, error: String(error) });
+  });
+}
+
+async function recoverUnavailableSearch(page: Page, keyword: string, pageNum: number, logger: Logger): Promise<boolean> {
+  const unavailable = await isSearchUnavailable(page);
+  if (!unavailable) {
+    return true;
+  }
+
+  for (let retry = 1; retry <= 3; retry += 1) {
+    const backoffBase = 1500 * 2 ** (retry - 1);
+    logger.warn('Search is currently unavailable; retrying page', { keyword, pageNum, retry, backoffBaseMs: backoffBase });
+    await sleepWithJitter(backoffBase, 400, 1200);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    if (!(await isSearchUnavailable(page))) {
+      return true;
+    }
+  }
+
+  logger.warn('Search unavailable persisted; skipping keyword pagination', { keyword, pageNum });
+  return false;
 }
 
 async function recoverFromPageOrContextClosure(page: Page, errorMessage: string, logger: Logger): Promise<void> {
@@ -162,9 +298,7 @@ function mapHitToSearchPayload(course: UnknownRecord): SearchResultPayload | nul
     return null;
   }
 
-  const instructorsArray = Array.isArray(course.visible_instructors)
-    ? course.visible_instructors.filter(isRecord)
-    : [];
+  const instructorsArray = Array.isArray(course.visible_instructors) ? course.visible_instructors.filter(isRecord) : [];
 
   const locale = isRecord(course.locale) ? toString(course.locale.locale) : '';
 
@@ -185,10 +319,6 @@ function mapHitToSearchPayload(course: UnknownRecord): SearchResultPayload | nul
 
 function sanitizeKeyword(keyword: string): string {
   return keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'keyword';
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function toString(value: unknown): string {

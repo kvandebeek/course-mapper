@@ -1,10 +1,12 @@
-import path from 'node:path';
+import * as path from 'node:path';
 import { BrowserType, chromium } from 'playwright';
 import { Logger } from '../logger.js';
+import { BrowserChannel } from '../types.js';
 import { createRuntimeSession, RuntimeSession } from './session.js';
 
 interface SessionManagerOptions {
   browserType?: BrowserType;
+  browserChannel: BrowserChannel;
   profileDir: string;
   headless: boolean;
   logger: Logger;
@@ -22,19 +24,39 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
   let creating: Promise<RuntimeSession> | null = null;
 
   async function createSession(): Promise<RuntimeSession> {
+    const preferredChannel = options.browserChannel === 'chromium' ? 'chrome' : options.browserChannel;
+
     options.logger.info('Creating persistent browser session', {
       profileDir,
       headless: options.headless,
-      browserType: browserType.name()
+      browserType: browserType.name(),
+      browserChannel: preferredChannel
     });
 
-    const context = await browserType.launchPersistentContext(profileDir, {
+    const launchOptions: Parameters<typeof browserType.launchPersistentContext>[1] = {
       headless: options.headless,
-      viewport: { width: 1440, height: 900 }
-    });
+      viewport: { width: 1440, height: 900 },
+      channel: preferredChannel,
+      args: ['--disable-blink-features=AutomationControlled']
+    };
+
+    let context;
+    try {
+      context = await browserType.launchPersistentContext(profileDir, launchOptions);
+    } catch (error) {
+      options.logger.warn('Preferred browser channel unavailable; falling back to default Chromium channel', {
+        preferredChannel,
+        error: String(error)
+      });
+      context = await browserType.launchPersistentContext(profileDir, {
+        headless: options.headless,
+        viewport: { width: 1440, height: 900 },
+        args: ['--disable-blink-features=AutomationControlled']
+      });
+    }
 
     const runtimeSession = await createRuntimeSession(context, options.logger);
-    options.logger.info('Persistent browser session created', { profileDir });
+    options.logger.info('Persistent browser session created', { profileDir, browserChannel: preferredChannel });
     return runtimeSession;
   }
 

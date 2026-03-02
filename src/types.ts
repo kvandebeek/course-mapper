@@ -1,12 +1,15 @@
 export interface CliOptions {
   headless: boolean;
   debug: boolean;
+  browserChannel: BrowserChannel;
   maxCoursesPerKeyword: number;
   maxPages: number;
   throttleMs: number;
   concurrency: number;
   profileDir: string;
 }
+
+export type BrowserChannel = 'chrome' | 'msedge' | 'chromium';
 
 export interface AppConfig {
   baseUrl: string;
@@ -47,6 +50,7 @@ export interface CourseScored extends CourseRaw {
   level: string;
   moduleType: string;
   score: number;
+  failureReason?: string;
 }
 
 export interface SearchResultPayload {

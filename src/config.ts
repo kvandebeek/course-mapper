@@ -1,7 +1,8 @@
-import path from 'node:path';
-import { CliOptions, AppConfig } from './types.js';
+import * as path from 'node:path';
+import { BrowserChannel, CliOptions, AppConfig } from './types.js';
 
 const DEFAULT_ENGLISH_LOCALES = ['en', 'en_US', 'en_GB'];
+const ALLOWED_BROWSER_CHANNELS: readonly BrowserChannel[] = ['chrome', 'msedge', 'chromium'];
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) {
@@ -16,14 +17,25 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return fallback;
 }
 
+function parseBrowserChannel(value: string | undefined): BrowserChannel {
+  if (!value) {
+    return 'chrome';
+  }
+  if (ALLOWED_BROWSER_CHANNELS.includes(value as BrowserChannel)) {
+    return value as BrowserChannel;
+  }
+  throw new Error(`Invalid --browserChannel value: ${value}. Allowed values: ${ALLOWED_BROWSER_CHANNELS.join(', ')}`);
+}
+
 export function getCliOptions(argv: string[]): CliOptions {
   const options: CliOptions = {
     headless: false,
     debug: false,
+    browserChannel: 'chrome',
     maxCoursesPerKeyword: 200,
     maxPages: 15,
     throttleMs: 300,
-    concurrency: 2,
+    concurrency: 1,
     profileDir: './artifacts/profile'
   };
 
@@ -46,6 +58,9 @@ export function getCliOptions(argv: string[]): CliOptions {
       case '--debug':
         options.debug = parseBoolean(value, options.debug);
         break;
+      case '--browserChannel':
+        options.browserChannel = parseBrowserChannel(value);
+        break;
       case '--maxCoursesPerKeyword':
         if (value !== undefined) {
           options.maxCoursesPerKeyword = Number(value);
@@ -63,7 +78,7 @@ export function getCliOptions(argv: string[]): CliOptions {
         break;
       case '--concurrency':
         if (value !== undefined) {
-          options.concurrency = Math.min(2, Number(value));
+          options.concurrency = Math.max(1, Number(value));
         }
         break;
       case '--profileDir':

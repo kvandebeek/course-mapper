@@ -10,12 +10,29 @@ import { writeOutputCsv } from './csvWriter.js';
 import { CourseScored } from './types.js';
 import { createSessionManager } from './runtime/sessionManager.js';
 
+function printHelp(): void {
+  console.log(`Udemy Business scraper options:
+  --headless=true|false
+  --debug=true|false
+  --browserChannel=chrome|msedge|chromium (default: chrome)
+  --maxCoursesPerKeyword=<number>
+  --maxPages=<number>
+  --throttleMs=<number>
+  --concurrency=<number> (default: 1)
+  --profileDir=<path>`);
+}
+
 async function main(): Promise<void> {
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    printHelp();
+    return;
+  }
   const cli = getCliOptions(process.argv);
   const config = getAppConfig();
   const logger = createLogger(cli.debug);
   const totalStart = Date.now();
   const sessionManager = createSessionManager({
+    browserChannel: cli.browserChannel,
     profileDir: cli.profileDir,
     headless: cli.headless,
     logger
@@ -26,13 +43,7 @@ async function main(): Promise<void> {
   const keywords = await loadKeywords(resolvePath(config.inputCsvPath));
   logger.info('Loaded keywords', { count: keywords.length });
 
-  let session = await initAuthenticatedSession(
-    sessionManager,
-    config.baseUrl,
-    config.orgHomePath,
-    cli.headless,
-    logger
-  );
+  let session = await initAuthenticatedSession(sessionManager, config.baseUrl, config.orgHomePath, cli.headless, logger);
 
   const finalRows: CourseScored[] = [];
 
@@ -42,22 +53,51 @@ async function main(): Promise<void> {
       logger.info('Keyword processing started', { keyword: keywordRow.keyword });
       session = await sessionManager.getOrCreateSession();
 
-      const searchResults = await scrapeKeywordCourses(session, config.baseUrl, keywordRow.keyword, {
-        maxCoursesPerKeyword: cli.maxCoursesPerKeyword,
-        maxPages: cli.maxPages,
-        throttleMs: cli.throttleMs
-      }, logger);
+      const scrapeResult = await scrapeKeywordCourses(
+        session,
+        config.baseUrl,
+        keywordRow.keyword,
+        {
+          maxCoursesPerKeyword: cli.maxCoursesPerKeyword,
+          maxPages: cli.maxPages,
+          throttleMs: cli.throttleMs
+        },
+        logger
+      );
 
-      const enriched = await enrichCourses(session.context, keywordRow.keyword, searchResults, cli.concurrency, logger);
+      const enriched = await enrichCourses(session.context, keywordRow.keyword, [...scrapeResult.courses], cli.concurrency, logger);
       const filtered = filterCourses(enriched, config);
       const topThree = scoreAndSelectTopThree(filtered, keywordRow);
+      if (topThree.length === 0 && scrapeResult.failureReason) {
+        finalRows.push({
+          track: keywordRow.track,
+          level: keywordRow.level,
+          moduleType: keywordRow.moduleType,
+          keyword: keywordRow.keyword,
+          courseId: '',
+          url: '',
+          title: '',
+          instructors: '',
+          language: '',
+          durationMinutes: null,
+          udemyLevel: null,
+          category: null,
+          rating: null,
+          ratingCount: null,
+          lastUpdated: null,
+          score: 0,
+          badges: [],
+          failureReason: scrapeResult.failureReason
+        });
+      }
       finalRows.push(...topThree);
 
       logger.info('Keyword processing completed', {
         keyword: keywordRow.keyword,
-        fetched: searchResults.length,
+        fetched: scrapeResult.courses.length,
         filtered: filtered.length,
         exported: topThree.length,
+        failureReason: scrapeResult.failureReason,
         durationMs: Date.now() - start
       });
     } catch (error) {
@@ -72,13 +112,7 @@ async function main(): Promise<void> {
         logger.warn('Keyword failure triggered session recreation', { keyword: keywordRow.keyword });
         try {
           await sessionManager.closeSession();
-          session = await initAuthenticatedSession(
-            sessionManager,
-            config.baseUrl,
-            config.orgHomePath,
-            cli.headless,
-            logger
-          );
+          session = await initAuthenticatedSession(sessionManager, config.baseUrl, config.orgHomePath, cli.headless, logger);
           logger.info('Session recreated after keyword failure');
         } catch (recreateError) {
           logger.error('Failed to recreate session', { error: String(recreateError) });
