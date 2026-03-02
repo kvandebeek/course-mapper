@@ -90,6 +90,19 @@ Columns:
 - Continues per-keyword on failures; one keyword failure will not abort the run.
 - Structured logs include timings per keyword and run total.
 
+
+## Session lifecycle
+- Runtime uses a `RuntimeSession` abstraction to track context close and browser disconnect events without calling `BrowserContext.isClosed()` (not available in Playwright).
+- A single `getOrCreateSession()` path reuses healthy persistent sessions and recreates closed/disconnected ones with an in-process creation lock.
+- Manual SSO behavior remains deterministic: headed login waits for ENTER and does not auto-close your profile mid-run.
+
+## Smoke check
+Run a lightweight lifecycle smoke check:
+```bash
+npm run smoke
+```
+This validates create -> reuse -> close -> recreate flow for persistent sessions.
+
 ## Troubleshooting
 - **Login keeps failing in headless mode**: run with `--headless=false` and complete SSO manually once.
 - **Empty results**: verify keyword relevance, account access, and that filters are not excluding all courses.

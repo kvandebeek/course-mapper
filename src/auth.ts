@@ -1,26 +1,17 @@
-import path from 'node:path';
 import readline from 'node:readline/promises';
-import { chromium, BrowserContext, Page } from 'playwright';
 import { Logger } from './logger.js';
-
-export interface AuthSession {
-  context: BrowserContext;
-  page: Page;
-}
+import { RuntimeSession } from './runtime/session.js';
+import { SessionManager } from './runtime/sessionManager.js';
 
 export async function initAuthenticatedSession(
-  profileDir: string,
+  sessionManager: SessionManager,
   baseUrl: string,
   orgHomePath: string,
   headless: boolean,
   logger: Logger
-): Promise<AuthSession> {
-  const context = await chromium.launchPersistentContext(path.resolve(profileDir), {
-    headless,
-    viewport: { width: 1440, height: 900 }
-  });
-
-  const page = context.pages()[0] ?? (await context.newPage());
+): Promise<RuntimeSession> {
+  const session = await sessionManager.getOrCreateSession();
+  const page = await session.ensurePage();
 
   await page.goto(`${baseUrl}${orgHomePath}`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle');
@@ -46,10 +37,10 @@ export async function initAuthenticatedSession(
   }
 
   logger.info('Authenticated session ready.');
-  return { context, page };
+  return session;
 }
 
-async function checkLoggedIn(page: Page, baseUrl: string, orgHomePath: string): Promise<boolean> {
+async function checkLoggedIn(page: RuntimeSession['page'], baseUrl: string, orgHomePath: string): Promise<boolean> {
   const current = page.url();
   if (!current.startsWith(baseUrl)) {
     return false;

@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { BrowserContext, Page } from 'playwright';
+import { Page } from 'playwright';
 import { Logger } from './logger.js';
+import { RuntimeSession } from './runtime/session.js';
 import { SearchResultPayload } from './types.js';
 import { waitForSearchPayload } from './udemy/searchTransport.js';
 import { UnknownRecord, isRecord, tryExtractHits } from './udemy/types.js';
@@ -12,13 +13,8 @@ interface SearchParams {
   throttleMs: number;
 }
 
-export interface SearchRuntime {
-  context: BrowserContext;
-  page: Page | null;
-}
-
 export async function scrapeKeywordCourses(
-  runtime: SearchRuntime,
+  session: RuntimeSession,
   baseUrl: string,
   keyword: string,
   params: SearchParams,
@@ -49,13 +45,13 @@ export async function scrapeKeywordCourses(
           await delay(backoffMs);
         }
 
-        runtime.page = await ensurePage(runtime.context, runtime.page);
-        await runtime.context.tracing.start({ screenshots: true, snapshots: true });
+        const page = await session.ensurePage();
+        await session.context.tracing.start({ screenshots: true, snapshots: true });
 
         logger.info('Navigating keyword search page', { keyword, pageNum, attempt, url: searchUrl });
-        await runtime.page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-        const match = await waitForSearchPayload(runtime.page, 60000);
+        const match = await waitForSearchPayload(page, 60000);
         const hits = tryExtractHits(match.payload) ?? [];
         const parsed = hits.map(mapHitToSearchPayload).filter((item): item is SearchResultPayload => item !== null);
 
@@ -65,7 +61,7 @@ export async function scrapeKeywordCourses(
           }
         }
 
-        await runtime.context.tracing.stop();
+        await session.context.tracing.stop();
 
         logger.info('Search payload captured', {
           keyword,
@@ -93,8 +89,8 @@ export async function scrapeKeywordCourses(
           error: message
         });
 
-        await captureDiagnostics(runtime.page, keyword, pageNum, attempt, traceFile, logger);
-        await recoverFromPageOrContextClosure(runtime, message, logger);
+        await captureDiagnostics(session.page, keyword, pageNum, attempt, traceFile, logger);
+        await recoverFromPageOrContextClosure(session.page, message, logger);
 
         if (attempt === 3) {
           logger.error('Keyword page failed after retries', { keyword, pageNum, durationMs, error: message });
@@ -113,35 +109,17 @@ export async function scrapeKeywordCourses(
   return [...courseMap.values()].slice(0, params.maxCoursesPerKeyword);
 }
 
-export async function ensurePage(context: BrowserContext, page: Page | null): Promise<Page> {
-  if (context.isClosed()) {
-    throw new Error('Browser context is closed');
-  }
-
-  if (!page || page.isClosed()) {
-    const nextPage = await context.newPage();
-    nextPage.setDefaultNavigationTimeout(60000);
-    nextPage.setDefaultTimeout(60000);
-    return nextPage;
-  }
-
-  page.setDefaultNavigationTimeout(60000);
-  page.setDefaultTimeout(60000);
-  return page;
-}
-
-async function recoverFromPageOrContextClosure(runtime: SearchRuntime, errorMessage: string, logger: Logger): Promise<void> {
-  const closedPage = runtime.page?.isClosed() ?? false;
+async function recoverFromPageOrContextClosure(page: Page, errorMessage: string, logger: Logger): Promise<void> {
+  const closedPage = page.isClosed();
   const closureError = errorMessage.toLowerCase().includes('context or browser has been closed');
 
   if (closedPage || closureError) {
-    runtime.page = null;
-    logger.warn('Page closed or invalidated; will recreate for next attempt');
+    logger.warn('Page closed or invalidated; session will ensure page on next attempt');
   }
 }
 
 async function captureDiagnostics(
-  page: Page | null,
+  page: Page,
   keyword: string,
   pageNum: number,
   attempt: number,
@@ -152,7 +130,7 @@ async function captureDiagnostics(
   await fs.mkdir(debugDir, { recursive: true });
 
   try {
-    if (page && !page.isClosed()) {
+    if (!page.isClosed()) {
       const screenshotPath = path.join(debugDir, `page-${pageNum}-attempt-${attempt}.png`);
       await page.screenshot({ path: screenshotPath, fullPage: true });
     }
@@ -161,7 +139,7 @@ async function captureDiagnostics(
   }
 
   try {
-    await page?.context().tracing.stop({ path: traceFile });
+    await page.context().tracing.stop({ path: traceFile });
   } catch (error) {
     logger.warn('Unable to write trace', { keyword, pageNum, attempt, error: String(error) });
   }
