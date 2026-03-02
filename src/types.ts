@@ -19,7 +19,6 @@ export interface AppConfig {
   englishLocales: ReadonlySet<string>;
   minRating: number;
   minRatingCount: number;
-  recencyMonths: number;
 }
 
 export interface KeywordRow {
@@ -42,14 +41,12 @@ export interface CourseRaw {
   courseId: string;
   url: string;
   title: string;
-  instructors: string;
   language: string;
   durationMinutes: number | null;
   udemyLevel: string | null;
   category: string | null;
   rating: number | null;
   ratingCount: number | null;
-  lastUpdated: string | null;
   badges: string[];
 }
 
@@ -65,7 +62,6 @@ export interface SearchResultPayload {
   id: string;
   url: string;
   title: string;
-  instructors: string;
   locale: string;
   rating: number | null;
   ratingCount: number | null;

@@ -66,7 +66,6 @@ export async function extractCoursesFromDom(page: Page): Promise<readonly Search
       id,
       title,
       url: normalizedUrl,
-      instructors: '',
       locale: '',
       rating: null,
       ratingCount: null,
@@ -298,18 +297,12 @@ function mapHitToSearchPayload(course: UnknownRecord): SearchResultPayload | nul
     return null;
   }
 
-  const instructorsArray = Array.isArray(course.visible_instructors) ? course.visible_instructors.filter(isRecord) : [];
-
   const locale = isRecord(course.locale) ? toString(course.locale.locale) : '';
 
   return {
     id: String(idValue),
     url,
     title,
-    instructors: instructorsArray
-      .map((ins) => toString(ins.display_name))
-      .filter((name) => name.length > 0)
-      .join('; '),
     locale: locale || toString(course.locale_simple),
     rating: toNumber(course.rating),
     ratingCount: toNumber(course.num_reviews),

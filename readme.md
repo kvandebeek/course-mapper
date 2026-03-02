@@ -60,7 +60,7 @@ Use `--help` to print CLI help at runtime.
 `./artifacts/udemy/top_courses.csv`
 
 Columns:
-- `track,level,moduleType,keyword,courseId,url,title,instructors,language,durationMinutes,udemyLevel,category,rating,ratingCount,lastUpdated,score,status,failureReason`
+- `track,level,moduleType,keyword,courseId,url,title,language,durationMinutes,udemyLevel,category,rating,ratingCount,score,status,failureReason`
 
 ## Troubleshooting
 - **“Sorry, search is currently unavailable” appears**:
