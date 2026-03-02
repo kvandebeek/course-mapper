@@ -5,14 +5,16 @@ import { Logger } from '../logger.js';
 import { extractCourseDetail, CourseDetail } from './extractCourseDetail.js';
 import {
   SearchFilters,
-  buildPaginatedUrl,
   buildSearchUrl,
   gotoWithRetries,
   writeNavigationFailureArtifacts
 } from './navigation.js';
-import { extractCourseDetailUrlsFromSearchHtml } from './parseSearchResults.js';
 
-const PAGE_SIZE = 24;
+const RESULT_WAIT_TIMEOUT_MS = 20_000;
+const LOAD_MORE_WAIT_TIMEOUT_MS = 8_000;
+const DEBUG_HREF_LIMIT = 30;
+
+export type CourseUrl = string;
 
 export const DEFAULT_FILTERS: SearchFilters = {
   minRating: 4.5,
@@ -33,64 +35,46 @@ export async function collectCourseUrlsForKeyword(
   const baseSearchUrl = buildSearchUrl(keyword, opts.filters);
   logger.info('Keyword URL collection started', { keyword, baseSearchUrl });
 
-  const unique = new Set<string>();
-  const variants: ReadonlyArray<'p' | 'page' | 'pageNumber' | 'start'> = ['p', 'page', 'pageNumber', 'start'];
+  const unique = new Set<CourseUrl>();
+
+  try {
+    await gotoWithRetries(page, baseSearchUrl);
+    await waitForSearchResultsUi(page);
+  } catch (error) {
+    await writeNavigationFailureArtifacts(page, 'search_nav_fail', baseSearchUrl, error, keyword);
+    logger.warn('Search navigation failed', { keyword, url: baseSearchUrl, error: String(error) });
+    return [];
+  }
 
   for (let pageIndex = 1; pageIndex <= opts.maxPages; pageIndex += 1) {
-    const candidateUrls = pageIndex === 1
-      ? [baseSearchUrl]
-      : variants.map((variant) => buildPaginatedUrl(baseSearchUrl, pageIndex, variant, PAGE_SIZE));
-
-    let accepted = false;
-
-    for (let variantIndex = 0; variantIndex < candidateUrls.length; variantIndex += 1) {
-      const candidateUrl = candidateUrls[variantIndex];
-      if (!candidateUrl) {
-        continue;
-      }
-      const variantName = pageIndex === 1 ? 'base' : variants[variantIndex] ?? 'base';
-
-      await gotoWithRetries(page, candidateUrl);
-      const html = await page.content();
-      const parsed = extractCourseDetailUrlsFromSearchHtml(html);
-      const before = unique.size;
-      for (const url of parsed.courseUrls) {
-        if (unique.size >= opts.maxCourses) {
-          break;
-        }
-        unique.add(url);
-      }
-      const added = unique.size - before;
-
-      logger.info('Pagination attempt', {
-        keyword,
-        pageIndex,
-        variant: variantName,
-        url: candidateUrl,
-        extracted: parsed.courseUrls.length,
-        added,
-        totalUnique: unique.size,
-        totalAnchors: parsed.debug.totalAnchors,
-        matchedAnchors: parsed.debug.matched
-      });
-
-      if (parsed.courseUrls.length === 0 && pageIndex === 1) {
-        await dumpEmptySearchHtml(keyword, page, html, logger);
-      }
-
-      if (added > 0 || (pageIndex === 1 && parsed.courseUrls.length > 0)) {
-        accepted = true;
-        break;
-      }
-    }
-
-    if (!accepted) {
-      logger.info('Pagination ended early due to no new urls', { keyword, pageIndex, totalUnique: unique.size });
-      break;
+    const iteration = await collectSearchIteration(page, keyword, unique, opts.maxCourses, logger, pageIndex);
+    if (iteration.extractedCount === 0) {
+      await dumpEmptySearchHtml(keyword, page, await page.content(), logger, iteration.debug);
     }
 
     if (unique.size >= opts.maxCourses) {
       logger.info('Reached max course URL cap', { keyword, maxCourses: opts.maxCourses });
+      break;
+    }
+
+    if (iteration.addedCount === 0) {
+      logger.info('Pagination ended early due to no new urls', { keyword, pageIndex, totalUnique: unique.size });
+      break;
+    }
+
+    const loadedMore = await tryLoadMoreResults(page, keyword, pageIndex, logger);
+    if (!loadedMore) {
+      logger.info('Pagination ended: no load-more action available', { keyword, pageIndex, totalUnique: unique.size });
+      break;
+    }
+
+    const grew = await waitForCourseAnchorGrowth(page, iteration.courseLikeAnchorCount);
+    if (!grew) {
+      logger.info('Pagination ended: no additional course anchors found after load more', {
+        keyword,
+        pageIndex,
+        totalUnique: unique.size
+      });
       break;
     }
   }
@@ -244,17 +228,178 @@ function parseDate(value: string): Date | null {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-async function dumpEmptySearchHtml(keyword: string, page: Page, html: string, logger: Logger): Promise<void> {
+async function waitForSearchResultsUi(page: Page): Promise<void> {
+  const preferred = page.locator('[data-purpose*="search-course-card" i] a[href], [data-purpose="search-course-card-title"]');
+  const fallback = page.locator('a[href*="/course/"]');
+  const deadline = Date.now() + RESULT_WAIT_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    if ((await preferred.count()) > 0 || (await fallback.count()) > 0) {
+      return;
+    }
+    await page.waitForLoadState('networkidle', { timeout: 1_500 }).catch(() => {});
+  }
+
+  await fallback.first().waitFor({ state: 'visible', timeout: 2_000 });
+}
+
+async function extractRenderedHrefs(page: Page): Promise<readonly string[]> {
+  return page.locator('a[href]').evaluateAll((anchors) => {
+    const hrefs: string[] = [];
+    for (const anchor of anchors) {
+      const href = anchor.getAttribute('href');
+      if (href) {
+        hrefs.push(href);
+      }
+    }
+    return hrefs;
+  });
+}
+
+export function canonicalizeUrl(rawHref: string, baseUrl: string): string | null {
+  if (!rawHref.includes('/course/')) {
+    return null;
+  }
+
+  try {
+    const base = new URL(baseUrl);
+    const parsed = new URL(rawHref, baseUrl);
+    if (parsed.host !== base.host) {
+      return null;
+    }
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function collectSearchIteration(
+  page: Page,
+  keyword: string,
+  unique: Set<CourseUrl>,
+  maxCourses: number,
+  logger: Logger,
+  pageIndex: number
+): Promise<{ readonly extractedCount: number; readonly addedCount: number; readonly courseLikeAnchorCount: number; readonly debug: HrefDebugDump }> {
+  const rawHrefs = await extractRenderedHrefs(page);
+  const courseLikeHrefs = rawHrefs.filter((href) => href.includes('/course/'));
+  const extracted = new Set<CourseUrl>();
+
+  for (const href of courseLikeHrefs) {
+    const canonical = canonicalizeUrl(href, page.url());
+    if (!canonical) {
+      continue;
+    }
+    extracted.add(canonical);
+  }
+
+  const before = unique.size;
+  for (const courseUrl of extracted) {
+    if (unique.size >= maxCourses) {
+      break;
+    }
+    unique.add(courseUrl);
+  }
+  const addedCount = unique.size - before;
+
+  logger.info('Pagination attempt', {
+    keyword,
+    pageIndex,
+    url: page.url(),
+    totalAnchors: rawHrefs.length,
+    courseLikeHrefCount: courseLikeHrefs.length,
+    extracted: extracted.size,
+    added: addedCount,
+    totalUnique: unique.size
+  });
+
+  return {
+    extractedCount: extracted.size,
+    addedCount,
+    courseLikeAnchorCount: await page.locator('a[href*="/course/"]').count(),
+    debug: {
+      hrefs: rawHrefs.slice(0, DEBUG_HREF_LIMIT),
+      courseLikeHrefs: courseLikeHrefs.slice(0, DEBUG_HREF_LIMIT)
+    }
+  };
+}
+
+interface HrefDebugDump {
+  readonly hrefs: readonly string[];
+  readonly courseLikeHrefs: readonly string[];
+}
+
+async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number, logger: Logger): Promise<boolean> {
+  const loadMoreCandidates = [
+    page.getByRole('button', { name: /load more|show more/i }),
+    page.locator('[data-purpose*="load-more" i], [data-purpose*="show-more" i]')
+  ];
+
+  try {
+    for (const candidate of loadMoreCandidates) {
+      const count = await candidate.count();
+      for (let i = 0; i < count; i += 1) {
+        const item = candidate.nth(i);
+        if (await item.isVisible().catch(() => false) && await item.isEnabled().catch(() => false)) {
+          await item.click({ timeout: 5_000 });
+          logger.info('Load more action', { keyword, pageIndex, action: 'click' });
+          return true;
+        }
+      }
+    }
+
+    await page.evaluate(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'auto' });
+    });
+    logger.info('Load more action', { keyword, pageIndex, action: 'scroll' });
+    return true;
+  } catch (error) {
+    await writeNavigationFailureArtifacts(page, 'search_load_more_fail', page.url(), error, keyword);
+    logger.warn('Load more action failed', { keyword, pageIndex, error: String(error) });
+    return false;
+  }
+}
+
+async function waitForCourseAnchorGrowth(page: Page, previousCount: number): Promise<boolean> {
+  try {
+    await page.waitForFunction(
+      (count) => document.querySelectorAll('a[href*="/course/"]').length > count,
+      previousCount,
+      { timeout: LOAD_MORE_WAIT_TIMEOUT_MS }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function dumpEmptySearchHtml(
+  keyword: string,
+  page: Page,
+  html: string,
+  logger: Logger,
+  hrefDebug?: HrefDebugDump
+): Promise<void> {
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const safeKeyword = keyword.replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
   const dir = path.join('artifacts', 'nav_failures');
   await fs.mkdir(dir, { recursive: true });
   const outPath = path.join(dir, `search_${safeKeyword}_${ts}.html`);
   await fs.writeFile(outPath, html, 'utf-8');
+
+  let hrefDumpPath = '';
+  if (hrefDebug) {
+    hrefDumpPath = path.join(dir, `search_${safeKeyword}_${ts}_hrefs.json`);
+    await fs.writeFile(hrefDumpPath, JSON.stringify(hrefDebug, null, 2), 'utf-8');
+  }
+
   logger.info('No search URLs found; dumped HTML', {
     keyword,
     currentUrl: page.url(),
     title: await page.title().catch(() => ''),
-    htmlPath: outPath
+    htmlPath: outPath,
+    hrefDumpPath
   });
 }
