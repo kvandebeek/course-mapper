@@ -65,8 +65,7 @@ async function main(): Promise<void> {
           maxPages: cli.maxPages,
           throttleMs: cli.throttleMs
         },
-        logger,
-        new Date()
+        logger
       );
 
       finalRows.push(

@@ -94,8 +94,7 @@ export async function collectAndRankTopCourses(
     readonly maxPages: number;
     readonly throttleMs: number;
   },
-  logger: Logger,
-  now: Date
+  logger: Logger
 ): Promise<readonly CourseDetail[]> {
   const urls = await collectCourseUrlsForKeyword(page, keyword, opts, logger);
 
@@ -139,7 +138,7 @@ export async function collectAndRankTopCourses(
         courseId: detail.courseId,
         title: detail.title
       });
-      const eligibility = isCourseEligible(detail, now);
+      const eligibility = isCourseEligible(detail);
 
       logger.info('Computed filters', {
         keyword,
@@ -147,8 +146,7 @@ export async function collectAndRankTopCourses(
         eligible: eligibility.ok,
         reason: eligibility.reason,
         rating: detail.rating,
-        ratingCount: detail.ratingCount,
-        lastUpdateDate: detail.lastUpdateDate
+        ratingCount: detail.ratingCount
       });
 
       logger.info('Detail extracted', {
@@ -158,7 +156,6 @@ export async function collectAndRankTopCourses(
         title: detail.title,
         rating: detail.rating,
         ratingCount: detail.ratingCount,
-        lastUpdateDate: detail.lastUpdateDate,
         eligible: eligibility.ok,
         reason: eligibility.reason
       });
@@ -189,20 +186,12 @@ export async function collectAndRankTopCourses(
   return rankCourses(details).slice(0, 3);
 }
 
-export function isCourseEligible(detail: CourseDetail, now: Date): { readonly ok: boolean; readonly reason: string } {
+export function isCourseEligible(detail: CourseDetail): { readonly ok: boolean; readonly reason: string } {
   if (detail.rating === null || detail.rating < 4.4) {
     return { ok: false, reason: 'rating_below_min' };
   }
   if (detail.ratingCount === null || detail.ratingCount < 1500) {
     return { ok: false, reason: 'rating_count_below_min' };
-  }
-  if (!detail.lastUpdateDate) {
-    return { ok: false, reason: 'missing_last_update_date' };
-  }
-
-  const months = monthDiffUtc(detail.lastUpdateDate, now);
-  if (months === null || months > 36) {
-    return { ok: false, reason: 'older_than_36_months' };
   }
 
   return { ok: true, reason: 'eligible' };
@@ -215,12 +204,7 @@ function rankCourses(courses: readonly CourseDetail[]): CourseDetail[] {
       return ratingCmp;
     }
 
-    const countCmp = compareNumberDesc(a.ratingCount, b.ratingCount);
-    if (countCmp !== 0) {
-      return countCmp;
-    }
-
-    return compareDateDesc(a.lastUpdateDate, b.lastUpdateDate);
+    return compareNumberDesc(a.ratingCount, b.ratingCount);
   });
 }
 
@@ -235,41 +219,6 @@ function compareNumberDesc(a: number | null, b: number | null): number {
     return -1;
   }
   return b - a;
-}
-
-function compareDateDesc(a: string | null, b: string | null): number {
-  const aTime = a ? Date.parse(a) : Number.NEGATIVE_INFINITY;
-  const bTime = b ? Date.parse(b) : Number.NEGATIVE_INFINITY;
-  return bTime - aTime;
-}
-
-function monthDiffUtc(lastUpdateDate: string, now: Date): number | null {
-  const parsed = parseDate(lastUpdateDate);
-  if (!parsed) {
-    return null;
-  }
-
-  const yearDiff = now.getUTCFullYear() - parsed.getUTCFullYear();
-  const monthDiff = now.getUTCMonth() - parsed.getUTCMonth();
-  let total = yearDiff * 12 + monthDiff;
-  if (now.getUTCDate() < parsed.getUTCDate()) {
-    total -= 1;
-  }
-  return total;
-}
-
-function parseDate(value: string): Date | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (!match?.[1] || !match[2] || !match[3]) {
-    return null;
-  }
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    return null;
-  }
-  return new Date(Date.UTC(year, month - 1, day));
 }
 
 async function waitForSearchResultsUi(page: Page, throttleMs: number, logger: Logger): Promise<void> {

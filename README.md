@@ -51,7 +51,6 @@ Default URL pre-filters:
 Final eligibility (from detail extraction):
 - rating `>= 4.4`
 - ratingCount `>= 1500`
-- `lastUpdateDate` within the last 36 months
 
 ## CLI flags
 - `--headless` (default: `false`)
@@ -69,7 +68,7 @@ Use `--help` to print CLI help at runtime.
 `./artifacts/udemy/top_courses.csv`
 
 Columns:
-- `keyword,courseTitle,courseUrl,rating,ratingCount,lastUpdateDate,publishedDate,instructors,courseId`
+- `keyword,courseTitle,courseUrl,rating,ratingCount,courseId`
 
 ## Diagnostics and failure artifacts
 On navigation/extraction failures, artifacts are saved under `artifacts/nav_failures/`:

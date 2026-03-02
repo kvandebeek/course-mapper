@@ -7,9 +7,6 @@ export interface CourseDetail {
   readonly url: string;
   readonly rating: number | null;
   readonly ratingCount: number | null;
-  readonly lastUpdateDate: string | null;
-  readonly publishedDate: string | null;
-  readonly instructors: readonly string[];
 }
 
 interface RuntimeExtraction {
@@ -17,9 +14,6 @@ interface RuntimeExtraction {
   courseId?: number;
   rating?: number;
   ratingCount?: number;
-  lastUpdateDate?: string;
-  publishedDate?: string;
-  instructors?: readonly string[];
   canonicalUrl?: string;
 }
 
@@ -73,19 +67,13 @@ async function extractDetailFromScripts(page: Page, keyword: string, courseUrl: 
   const runtimeCourse = parseUdRuntimePayload(html);
 
   const title = firstNonEmpty(runtimeCourse?.title, ldCourse?.name, pageTitle, 'Untitled Course');
-  const runtimeInstructors = runtimeCourse?.instructors ?? [];
-  const instructors = runtimeInstructors.length > 0 ? runtimeInstructors : (ldCourse?.instructors ?? []);
-
   const result: CourseDetail = {
     keyword,
     courseId: runtimeCourse?.courseId ?? null,
     title,
     url: firstNonEmpty(canonical ?? undefined, ldCourse?.url, courseUrl),
     rating: runtimeCourse?.rating ?? ldCourse?.ratingValue ?? null,
-    ratingCount: runtimeCourse?.ratingCount ?? ldCourse?.ratingCount ?? null,
-    lastUpdateDate: runtimeCourse?.lastUpdateDate ?? null,
-    publishedDate: runtimeCourse?.publishedDate ?? ldCourse?.datePublished ?? null,
-    instructors
+    ratingCount: runtimeCourse?.ratingCount ?? ldCourse?.ratingCount ?? null
   };
 
   if (!runtimeCourse && !ldCourse) {
@@ -100,8 +88,6 @@ interface ParsedLdCourse {
   url?: string;
   ratingValue?: number;
   ratingCount?: number;
-  datePublished?: string;
-  instructors: readonly string[];
 }
 
 function parseLdCourse(rawEntries: readonly string[]): ParsedLdCourse | null {
@@ -114,15 +100,7 @@ function parseLdCourse(rawEntries: readonly string[]): ParsedLdCourse | null {
       }
 
       const aggregate = asRecord(candidate.aggregateRating);
-      const author = candidate.author;
-
-      const instructors = Array.isArray(author)
-        ? author.map((value) => asRecord(value)?.name).filter(isString)
-        : isString(asRecord(author)?.name)
-          ? [asRecord(author)?.name as string]
-          : [];
-
-      const result: ParsedLdCourse = { instructors };
+      const result: ParsedLdCourse = {};
       const name = toOptionalString(candidate.name);
       if (name) { result.name = name; }
       const url = toOptionalString(candidate.url);
@@ -131,8 +109,6 @@ function parseLdCourse(rawEntries: readonly string[]): ParsedLdCourse | null {
       if (ratingValue !== undefined) { result.ratingValue = ratingValue; }
       const ratingCount = toOptionalNumber(aggregate?.ratingCount);
       if (ratingCount !== undefined) { result.ratingCount = ratingCount; }
-      const datePublished = toOptionalString(candidate.datePublished);
-      if (datePublished) { result.datePublished = datePublished; }
       return result;
     } catch {
       continue;
@@ -200,9 +176,7 @@ function parseUdRuntimePayload(html: string): RuntimeExtraction | null {
       return null;
     }
 
-    const instructors = parseInstructors(courseObject.visible_instructors ?? courseObject.instructors);
-
-    const result: RuntimeExtraction = { instructors };
+    const result: RuntimeExtraction = {};
     const title = toOptionalString(courseObject.title);
     if (title) { result.title = title; }
     const courseId = toOptionalNumber(courseObject.id) ?? toOptionalNumber(courseObject.courseId);
@@ -211,10 +185,6 @@ function parseUdRuntimePayload(html: string): RuntimeExtraction | null {
     if (rating !== undefined) { result.rating = rating; }
     const ratingCount = toOptionalNumber(courseObject.num_reviews) ?? toOptionalNumber(courseObject.rating_count);
     if (ratingCount !== undefined) { result.ratingCount = ratingCount; }
-    const lastUpdateDate = toOptionalString(courseObject.last_update_date) ?? toOptionalString(courseObject.lastUpdateDate);
-    if (lastUpdateDate) { result.lastUpdateDate = lastUpdateDate; }
-    const publishedDate = toOptionalString(courseObject.published_time) ?? toOptionalString(courseObject.publishedDate);
-    if (publishedDate) { result.publishedDate = publishedDate; }
     return result;
   } catch {
     return null;
@@ -291,19 +261,6 @@ function findCourseObject(input: unknown): Record<string, unknown> | null {
   }
 
   return null;
-}
-
-function parseInstructors(input: unknown): readonly string[] {
-  if (!Array.isArray(input)) {
-    return [];
-  }
-
-  return input
-    .map((entry) => {
-      const obj = asRecord(entry);
-      return toOptionalString(obj?.display_name);
-    })
-    .filter(isString);
 }
 
 function firstNonEmpty(...values: Array<string | undefined>): string {

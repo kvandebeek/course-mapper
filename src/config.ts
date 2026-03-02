@@ -107,7 +107,6 @@ export function getAppConfig(): AppConfig {
     englishLocales: new Set(DEFAULT_ENGLISH_LOCALES),
     minRating: 4.4,
     minRatingCount: 1500,
-    recencyMonths: 36
   };
 }
 

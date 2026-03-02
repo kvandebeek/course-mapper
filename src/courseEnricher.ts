@@ -55,7 +55,7 @@ async function fetchCourseDetails(
   keyword: string,
   item: SearchResultPayload
 ): Promise<CourseRaw> {
-  const endpoint = `https://resillion.udemy.com/api-2.0/courses/${item.id}/?fields[course]=title,url,headline,locale,avg_rating,num_reviews,instructional_level,content_info,estimated_content_length,last_update_date,primary_category,primary_subcategory,visible_instructors,badge_family`; 
+  const endpoint = `https://resillion.udemy.com/api-2.0/courses/${item.id}/?fields[course]=title,url,headline,locale,avg_rating,num_reviews,instructional_level,content_info,estimated_content_length,primary_category,primary_subcategory,badge_family`; 
   const response = await context.request.get(endpoint, {
     headers: {
       referer: item.url
@@ -72,13 +72,6 @@ async function fetchCourseDetails(
     || toString((payload.primary_category as Record<string, unknown> | undefined)?.title)
     || null;
 
-  const instructors = Array.isArray(payload.visible_instructors)
-    ? (payload.visible_instructors as Array<Record<string, unknown>>)
-        .map((instructor) => toString(instructor.display_name))
-        .filter((name) => name.length > 0)
-        .join('; ')
-    : item.instructors;
-
   const badges = Array.isArray(payload.badge_family)
     ? (payload.badge_family as Array<Record<string, unknown>>)
         .map((badge) => toString(badge.title))
@@ -92,14 +85,12 @@ async function fetchCourseDetails(
     courseId: item.id,
     url: toString(payload.url) || item.url,
     title: toString(payload.title) || item.title,
-    instructors,
     language: toString(localeObj?.locale) || item.locale,
     durationMinutes,
     udemyLevel: toString(payload.instructional_level) || item.level,
     category,
     rating: toNumber(payload.avg_rating) ?? item.rating,
     ratingCount: toNumber(payload.num_reviews) ?? item.ratingCount,
-    lastUpdated: toString(payload.last_update_date) || null,
     badges
   };
 }
@@ -110,14 +101,12 @@ function mapFallback(keyword: string, item: SearchResultPayload): CourseRaw {
     courseId: item.id,
     url: item.url,
     title: item.title,
-    instructors: item.instructors,
     language: item.locale,
     durationMinutes: null,
     udemyLevel: item.level,
     category: null,
     rating: item.rating,
     ratingCount: item.ratingCount,
-    lastUpdated: null,
     badges: []
   };
 }
