@@ -29,6 +29,18 @@ export interface KeywordRow {
   keyword: string;
 }
 
+export interface CourseCsvRow {
+  keyword: string;
+  courseTitle: string;
+  courseUrl: string;
+  rating: number | null;
+  ratingCount: number | null;
+  lastUpdateDate: string | null;
+  publishedDate: string | null;
+  instructors: string;
+  courseId: number | null;
+}
+
 export interface CourseRaw {
   keyword: string;
   courseId: string;

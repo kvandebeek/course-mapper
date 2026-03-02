@@ -1,53 +1,35 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { stringify } from 'csv-stringify/sync';
-import { CourseScored } from './types.js';
+import { CourseCsvRow } from './types.js';
 
-export async function writeOutputCsv(outputPath: string, rows: readonly CourseScored[]): Promise<void> {
+export async function writeOutputCsv(outputPath: string, rows: readonly CourseCsvRow[]): Promise<void> {
   await mkdir(path.dirname(outputPath), { recursive: true });
 
   const payload = rows.map((row) => ({
-    track: row.track,
-    level: row.level,
-    moduleType: row.moduleType,
     keyword: row.keyword,
-    courseId: row.courseId,
-    url: row.url,
-    title: row.title,
-    instructors: row.instructors,
-    language: row.language,
-    durationMinutes: row.durationMinutes ?? '',
-    udemyLevel: row.udemyLevel ?? '',
-    category: row.category ?? '',
+    courseTitle: row.courseTitle,
+    courseUrl: row.courseUrl,
     rating: row.rating ?? '',
     ratingCount: row.ratingCount ?? '',
-    lastUpdated: row.lastUpdated ?? '',
-    score: row.score,
-    status: row.failureReason ? 'failed' : 'ok',
-    failureReason: row.failureReason ?? ''
+    lastUpdateDate: row.lastUpdateDate ?? '',
+    publishedDate: row.publishedDate ?? '',
+    instructors: row.instructors,
+    courseId: row.courseId ?? ''
   }));
 
   const csv = stringify(payload, {
     header: true,
     columns: [
-      'track',
-      'level',
-      'moduleType',
       'keyword',
-      'courseId',
-      'url',
-      'title',
-      'instructors',
-      'language',
-      'durationMinutes',
-      'udemyLevel',
-      'category',
+      'courseTitle',
+      'courseUrl',
       'rating',
       'ratingCount',
-      'lastUpdated',
-      'score',
-      'status',
-      'failureReason'
+      'lastUpdateDate',
+      'publishedDate',
+      'instructors',
+      'courseId'
     ]
   });
 
