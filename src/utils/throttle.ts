@@ -1,8 +1,8 @@
 import { Logger } from '../logger.js';
 
-const DEFAULT_JITTER_RATIO = 0.35;
-const DEFAULT_BACKOFF_BASE_MS = 20_000;
-const DEFAULT_BACKOFF_MAX_MS = 120_000;
+const DEFAULT_JITTER_RATIO = 0.25;
+const DEFAULT_BACKOFF_BASE_MS = 10_000;
+const DEFAULT_BACKOFF_MAX_MS = 90_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 export function sleepMs(ms: number): Promise<void> {
