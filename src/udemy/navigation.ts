@@ -1,6 +1,8 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { BrowserContext, Page } from 'playwright';
+import { Logger } from '../logger.js';
+import { throttled } from '../utils/throttle.js';
 
 export type InstructionalLevel = 'all' | 'beginner' | 'intermediate' | 'expert';
 export type SortOrder = 'relevance' | 'highest-rated' | 'most-reviewed' | 'newest';
@@ -13,8 +15,6 @@ export interface SearchFilters {
 }
 
 export const UDEMY_ORIGIN = 'https://resillion.udemy.com' as const;
-
-const BACKOFF_MS: readonly number[] = [0, 500, 1500];
 
 export function buildSearchUrl(keyword: string, filters: SearchFilters): string {
   const url = new URL('/organization/search/', UDEMY_ORIGIN);
@@ -55,15 +55,17 @@ export function enforceSameTabNavigation(context: BrowserContext, page: Page): v
   });
 }
 
-export async function gotoWithRetries(page: Page, url: string): Promise<void> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < BACKOFF_MS.length; attempt += 1) {
-    const delayMs = BACKOFF_MS[attempt] ?? 0;
-    if (delayMs > 0) {
-      await page.waitForTimeout(delayMs);
-    }
-
-    try {
+export async function gotoWithRetries(
+  page: Page,
+  url: string,
+  opts: {
+    readonly operationName: string;
+    readonly throttleMs: number;
+    readonly logger: Logger;
+  }
+): Promise<void> {
+  await throttled(
+    async () => {
       await page.goto(url, { waitUntil: 'domcontentloaded' });
       await page.waitForURL((currentUrl) => currentUrl.host === 'resillion.udemy.com', { timeout: 30000 });
       const currentUrl = page.url().toLowerCase();
@@ -76,19 +78,23 @@ export async function gotoWithRetries(page: Page, url: string): Promise<void> {
       ) {
         throw new Error('Not authenticated');
       }
-      return;
-    } catch (error) {
-      lastError = error;
-      if (attempt === BACKOFF_MS.length - 1) {
-        await writeNavigationFailureArtifacts(page, 'nav_fail', url, error);
+      const response = await page.waitForResponse((response) => response.url() === page.url(), { timeout: 8_000 }).catch(() => null);
+      const status = response?.status();
+      if (status === 403 || status === 429) {
+        const error = new Error(`Navigation blocked with status ${status}`) as Error & { status: number };
+        error.status = status;
+        throw error;
       }
+    },
+    {
+      operationName: opts.operationName,
+      throttleMs: opts.throttleMs,
+      logger: opts.logger
     }
-  }
-
-  if (lastError instanceof Error) {
-    throw lastError;
-  }
-  throw new Error('Navigation failed');
+  ).catch(async (error) => {
+    await writeNavigationFailureArtifacts(page, 'nav_fail', url, error);
+    throw error;
+  });
 }
 
 export function buildPaginatedUrl(baseUrl: string, pageIndex: number, variant: 'p' | 'page' | 'pageNumber' | 'start', pageSize: number): string {

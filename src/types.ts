@@ -29,17 +29,13 @@ export interface KeywordRow {
   keyword: string;
 }
 
-export interface CourseCsvRow {
-  keyword: string;
-  courseTitle: string;
-  courseUrl: string;
-  rating: number | null;
-  ratingCount: number | null;
-  lastUpdateDate: string | null;
-  publishedDate: string | null;
-  instructors: string;
-  courseId: number | null;
-}
+export type ExportRow = {
+  readonly keyword: string;
+  readonly courseTitle: string;
+  readonly courseUrl: string;
+  readonly rating: number;
+  readonly ratingCount: number;
+};
 
 export interface CourseRaw {
   keyword: string;
