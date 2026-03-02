@@ -5,16 +5,17 @@
  * quickly understand where it sits in the scraping pipeline.
  */
 
+import { rm } from 'node:fs/promises';
 import { getAppConfig, getCliOptions, resolvePath } from './config.js';
 import { createLogger } from './logger.js';
 import { initAuthenticatedSession } from './auth.js';
-import { writeOutputCsv } from './csvWriter.js';
 import { ExportRow } from './types.js';
 import { createSessionManager } from './runtime/sessionManager.js';
 import { DEFAULT_FILTERS, collectAndRankTopCourses } from './udemy/scrapeKeyword.js';
 import { enforceSameTabNavigation } from './udemy/navigation.js';
 import { ensureNormalizedKeywords } from './keywords/ensureNormalizedKeywords.js';
 import { loadNormalizedKeywords } from './keywords/loadNormalizedKeywords.js';
+import { createIncrementalCsvWriter } from './io/incrementalCsvWriter.js';
 
 /**
  * printHelp: internal utility for this module.
@@ -83,6 +84,13 @@ async function main(): Promise<void> {
     const page = await session.ensurePage();
     enforceSameTabNavigation(session.context, page);
 
+    const outputCsvPath = resolvePath(config.outputCsvPath);
+    await rm(outputCsvPath, { force: true });
+    const writer = createIncrementalCsvWriter({
+      outputFilePath: outputCsvPath,
+      headers: ['keyword', 'courseTitle', 'courseUrl', 'rating', 'ratingCount']
+    });
+
     const finalRows: ExportRow[] = [];
 
     for (const keywordRow of keywords) {
@@ -106,15 +114,33 @@ async function main(): Promise<void> {
           logger
         );
 
-        finalRows.push(
-          ...topCourses.map((course) => ({
+        for (const course of topCourses) {
+          const row: ExportRow = {
             keyword: keywordRow.keyword,
             courseTitle: course.title,
             courseUrl: course.url,
             rating: course.rating ?? 0,
             ratingCount: course.ratingCount ?? 0
-          }))
-        );
+          };
+
+          finalRows.push(row);
+
+          try {
+            await writer.appendRow(row);
+            logger.debug('Wrote CSV row incrementally', {
+              keyword: row.keyword,
+              courseUrl: row.courseUrl,
+              courseTitle: row.courseTitle
+            });
+          } catch (appendError) {
+            logger.error('Failed to append CSV row; continuing', {
+              keyword: row.keyword,
+              courseUrl: row.courseUrl,
+              courseTitle: row.courseTitle,
+              error: String(appendError)
+            });
+          }
+        }
 
         logger.info('Keyword processing completed', {
           keyword: keywordRow.keyword,
@@ -132,10 +158,9 @@ async function main(): Promise<void> {
       }
     }
 
-    await writeOutputCsv(resolvePath(config.outputCsvPath), finalRows);
     logger.info('Run complete', {
       rows: finalRows.length,
-      output: config.outputCsvPath,
+      output: outputCsvPath,
       totalDurationMs: Date.now() - totalStart
     });
   } finally {
