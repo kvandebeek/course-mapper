@@ -86,6 +86,16 @@ export function getCliOptions(argv: string[]): CliOptions {
           options.profileDir = value;
         }
         break;
+      case '--keywordsFile':
+        if (value !== undefined) {
+          options.keywordsFile = value;
+        }
+        break;
+      case '--normalizedKeywordsFile':
+        if (value !== undefined) {
+          options.normalizedKeywordsFile = value;
+        }
+        break;
       default:
         break;
     }
@@ -102,7 +112,8 @@ export function getAppConfig(): AppConfig {
   return {
     baseUrl: 'https://resillion.udemy.com',
     orgHomePath: '/organization/home/',
-    inputCsvPath: './input/keywords.csv',
+    inputCsvPath: './keywords-list.csv',
+    normalizedKeywordsCsvPath: './artifacts/keywords.normalized.csv',
     outputCsvPath: './artifacts/udemy/top_courses.csv',
     englishLocales: new Set(DEFAULT_ENGLISH_LOCALES),
     minRating: 4.5,

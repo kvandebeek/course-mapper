@@ -1,12 +1,13 @@
 import { getAppConfig, getCliOptions, resolvePath } from './config.js';
 import { createLogger } from './logger.js';
-import { loadKeywords } from './keywordLoader.js';
 import { initAuthenticatedSession } from './auth.js';
 import { writeOutputCsv } from './csvWriter.js';
 import { ExportRow } from './types.js';
 import { createSessionManager } from './runtime/sessionManager.js';
 import { DEFAULT_FILTERS, collectAndRankTopCourses } from './udemy/scrapeKeyword.js';
 import { enforceSameTabNavigation } from './udemy/navigation.js';
+import { ensureNormalizedKeywords } from './keywords/ensureNormalizedKeywords.js';
+import { loadNormalizedKeywords } from './keywords/loadNormalizedKeywords.js';
 
 function printHelp(): void {
   console.log(`Udemy Business scraper options:
@@ -17,7 +18,9 @@ function printHelp(): void {
   --maxPages=<number>
   --throttleMs=<number>
   --concurrency=<number> (default: 1)
-  --profileDir=<path>`);
+  --profileDir=<path>
+  --keywordsFile=<path> (default: ./keywords-list.csv)
+  --normalizedKeywordsFile=<path> (default: ./artifacts/keywords.normalized.csv)`);
 }
 
 async function main(): Promise<void> {
@@ -38,8 +41,28 @@ async function main(): Promise<void> {
 
   logger.info('Starting scraper', { cli });
 
-  const keywords = await loadKeywords(resolvePath(config.inputCsvPath));
-  logger.info('Loaded keywords', { count: keywords.length });
+  const keywordsFile = resolvePath(cli.keywordsFile ?? config.inputCsvPath);
+  const normalizedKeywordsFile = resolvePath(cli.normalizedKeywordsFile ?? config.normalizedKeywordsCsvPath);
+
+  logger.info('Keyword files', { keywordsFile, normalizedKeywordsFile });
+  const ensureResult = await ensureNormalizedKeywords({
+    sourceFile: keywordsFile,
+    normalizedFile: normalizedKeywordsFile
+  });
+
+  if (ensureResult.regenerated) {
+    logger.info('Normalized keywords regenerated', {
+      normalizedKeywordsFile: ensureResult.normalizedFile,
+      generatedRows: ensureResult.generatedCount
+    });
+  } else {
+    logger.info('Normalized keywords are up-to-date', {
+      normalizedKeywordsFile: ensureResult.normalizedFile
+    });
+  }
+
+  const keywords = await loadNormalizedKeywords(normalizedKeywordsFile);
+  logger.info('Loaded normalized keywords', { count: keywords.length });
 
   let session = await initAuthenticatedSession(sessionManager, config.baseUrl, config.orgHomePath, cli.headless, logger);
   const page = await session.ensurePage();
