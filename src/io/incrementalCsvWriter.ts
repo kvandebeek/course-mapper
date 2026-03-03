@@ -1,3 +1,12 @@
+/**
+ * Incremental CSV append writer.
+ *
+ * Responsibilities:
+ * - Ensure parent directory and header line exist.
+ * - Serialize rows in configured column order.
+ * - Queue writes per output file path to keep append order deterministic and
+ *   prevent line interleaving under async call patterns.
+ */
 import { appendFile, mkdir, stat } from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -26,7 +35,8 @@ export function escapeCsvField(value: string): string {
 }
 
 /**
- * createIncrementalCsvWriter: public helper used by other modules.
+ * Creates a row-appending CSV writer that is safe to call repeatedly throughout
+ * a run (including inside per-keyword loops).
  */
 export function createIncrementalCsvWriter(options: IncrementalCsvWriterOptions): {
   appendRow(row: CsvRow): Promise<void>;

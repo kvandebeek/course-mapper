@@ -1,57 +1,45 @@
-# Course Mapper: Udemy Business Course Discovery CLI
+# Course Mapper (Udemy Business Scraper)
 
-Course Mapper is a TypeScript command-line tool that discovers and ranks Udemy Business courses for a curated keyword list, then exports a CSV ready for curriculum planning and review.
+Course Mapper is a TypeScript CLI that links career-framework keywords to Udemy Business courses, filters results using explicit quality gates, and exports traceable CSV artifacts.
 
-## What this project does
+## Technical Guide
 
-- Reads raw keyword metadata from `keywords-list.csv`.
-- Normalizes that keyword list into a deterministic machine-friendly file.
-- Opens an authenticated browser session (Playwright) against your Udemy Business tenant.
-- Scrapes search results for each keyword and fetches details for candidate courses.
-- Filters/ranks courses using a transparent score model.
-- Writes a final CSV (`artifacts/udemy/top_courses.csv`) with top matches.
-
-## Architecture at a glance
-
-1. **CLI orchestration** (`src/cli.ts`): parses flags, initializes session lifecycle, controls per-keyword workflow.
-2. **Keyword pipeline** (`src/keywords/*`): normalization, freshness checks, and loading.
-3. **Search + extraction** (`src/udemy/*`, `src/searchScraper.ts`): result page traversal + detail extraction.
-4. **Ranking and filtering** (`src/filter.ts`, `src/scoring.ts`, `src/courseEnricher.ts`).
-5. **Output** (`src/csvWriter.ts`) and structured logging (`src/logger.ts`).
-
-## Prerequisites
+### 1) Setup
 
 - Node.js `>= 20.11.0`
 - npm
-- A Udemy Business account with access to your organization catalog
-- First run in headed mode to complete SSO in a persistent profile
+- A Udemy Business tenant account with organization access
+- First run should be headed (`--headless=false`) so SSO can be completed and stored in the profile directory
 
-## Install
+### 2) Installation
 
 ```bash
 npm install
 ```
 
-## Common commands
+### 3) CLI usage
 
 ```bash
-# Main scrape run
-npm run scrape -- --headless=true --browserChannel=chrome --concurrency=1 --throttleMs=900 --maxPages=8
+# Show help
+npm run scrape -- --help
 
-# First run (manual login)
+# Typical scrape run (sequential, throttled)
+npm run scrape -- --headless=true --browserChannel=chrome --throttleMs=900 --maxPages=8
+
+# First-run login bootstrap (manual SSO in browser)
 npm run scrape -- --headless=false --profileDir=./artifacts/profile --browserChannel=chrome
 
 # Normalize keywords only
-npm run normalize-keywords
+npm run normalize:keywords
 
-# Smoke check
-npm run smoke
-
-# Tests
+# Type check / tests
+npm run typecheck
 npm test
 ```
 
-## CLI options
+### 4) Configuration and flags
+
+Supported runtime flags:
 
 - `--headless=true|false`
 - `--debug=true|false`
@@ -59,52 +47,45 @@ npm test
 - `--maxCoursesPerKeyword=<number>`
 - `--maxPages=<number>`
 - `--throttleMs=<number>`
-- `--concurrency=<number>` *(currently pinned to safe sequential behavior in config parsing)*
+- `--concurrency=<number>` *(currently parsed but effectively forced to sequential behavior)*
 - `--profileDir=<path>`
 - `--keywordsFile=<path>`
 - `--normalizedKeywordsFile=<path>`
-- `--durations=<comma-separated>` *(duration buckets: `extraShort`, `short`, `medium`, `long`, `extraLong`; default is `extraShort,short,medium,long` i.e. 0–17h)*
+- `--durations=<comma-separated buckets>` where buckets are `extraShort,short,medium,long,extraLong`
+- `--allCoursesDedupe=none|perRun`
 
-Run `npm run scrape -- --help` for a quick runtime summary.
+App defaults (from config):
 
-### Duration filter examples
+- base URL: `https://resillion.udemy.com`
+- org home path: `/organization/home/`
+- default thresholds: min rating `4.6`, min rating count `5000`
+- default duration filters: `extraShort,short,medium,long`
 
-- Default behavior (0–17h) is applied automatically when no duration filters are specified.
-- Only short courses (1–3h): `npm run scrape -- --durations short`
-- Custom combination: `npm run scrape -- --durations extraShort,medium,long`
-- Include only 17h+ courses: `npm run scrape -- --durations extraLong`
+### 5) Inputs
 
-## Input and output
-
-### Input
-
-`keywords-list.csv` with headers:
+Primary source CSV (default `keywords-list.csv`) uses headers:
 
 ```csv
 Track,Level,Core Modules,AI Modules,Softskills
 ```
 
-`Track` header matching is case-insensitive for compatibility (`Track` or `track` are accepted), but a non-empty track value is required on the first row for normalization.
-
-The normalization step writes `artifacts/keywords.normalized.csv` with headers:
+Normalized artifact (default `artifacts/keywords.normalized.csv`) uses:
 
 ```csv
 track,level,levelCodes,moduleType,keyword
 ```
 
-`levelCodes` is a pipe-delimited set (for example `B1|C1`) used to derive allowed Udemy instructional levels per keyword.
+### 6) Outputs
 
-### Output
+#### `artifacts/udemy/top_courses.csv`
 
-`artifacts/udemy/top_courses.csv` with columns:
+Final shortlisted courses:
 
 - `track`
 - `level`
 - `moduleType`
 - `keyword`
 - `courseInstructionalLevel`
-
-Instructional-level filtering is driven only by keyword level mapping + search URL `instructional_level` query parameters. Detail pages are not parsed for level and never used for eligibility decisions. Exported `courseInstructionalLevel` is always `all` to keep CSV schema/type compatibility.
 - `courseTitle`
 - `courseUrl`
 - `rating`
@@ -112,21 +93,108 @@ Instructional-level filtering is driven only by keyword level mapping + search U
 - `duration`
 - `durationTotalMinutes`
 
-## Reliability and anti-flake design
+#### `artifacts/udemy/all_courses.csv`
 
-- Persistent browser context for SSO stability.
-- Conservative throttling with jitter/backoff for rate-limit conditions.
-- Defensive parsing for API payload shape drift.
-- Navigation controls to keep scraper actions in one tab.
-- Graceful per-keyword failure handling so one bad query does not fail the run.
+Audit/trace log of inspected outcomes:
 
-## Troubleshooting
+- `runId`
+- `keyword`
+- `courseTitle`
+- `courseUrl`
+- `rating`
+- `ratingCount`
+- `courseInstructionalLevel`
+- `durationMinutes`
+- `lastUpdated`
+- `status` (`inspected|accepted|rejected`)
+- `failureReason`
 
-- **Not authenticated in headless mode**: run once with `--headless=false` and complete SSO.
-- **Search temporarily unavailable**: reduce speed (`--concurrency=1`, increase `--throttleMs`, reduce `--maxPages`).
-- **No rows exported**: validate keyword quality and account permissions in the tenant.
-- **Browser channel errors**: install Chrome/Edge or use `--browserChannel=chromium`.
+### 7) Folder structure
 
-## Responsible use
+- `src/cli.ts` — main orchestration
+- `src/config.ts` — CLI parsing + defaults
+- `src/keywords/*` — keyword normalization/loading
+- `src/levels/*` — career-level to instructional-level mappings
+- `src/udemy/*` — navigation, search, detail extraction, keyword scrape pipeline
+- `src/io/*` and `src/output/*` — incremental/audit CSV writers
+- `src/results/*` — export row shaping
+- `src/runtime/*` — Playwright session/context management
+- `src/utils/*` — retry/throttle/time helpers
+- `artifacts/` — runtime outputs, debug files, profile persistence
 
-Use this tooling within your organization’s approved automation policy and Udemy Business terms.
+### 8) Pipeline flow (high-level)
+
+1. Parse CLI and load app defaults.
+2. Ensure normalized keyword file exists and is fresh.
+3. Start/reuse persistent browser session and verify authentication.
+4. For each normalized keyword:
+   - derive allowed instructional levels from career level,
+   - run keyword searches (per instructional level),
+   - collect candidate course URLs,
+   - open course detail pages and extract fields,
+   - apply filters (blocked keyword, rating, rating count),
+   - score and rank accepted candidates,
+   - append shortlist/audit rows incrementally.
+5. Close writers/session and emit run summary logs.
+
+### 9) Operational notes
+
+- If headless auth fails, rerun with `--headless=false` and complete SSO.
+- Throttling and backoff are intentional for anti-blocking stability.
+- Debug artifacts are emitted on failures under `artifacts/debug` and `artifacts/nav_failures`.
+
+---
+
+## For HR, Sales, and Management
+
+This tool helps turn your career framework into a practical course shortlist.
+
+### What it does
+
+It reads your role/level keywords, searches Udemy Business for matching courses, removes weak or off-topic results, and creates a clean shortlist plus a trace file that explains what was accepted or rejected.
+
+### Why it exists
+
+Manually searching courses for every role and level is slow and inconsistent. This tool makes the process faster, repeatable, and easier to audit.
+
+### Problem it solves
+
+It closes the gap between:
+
+- a career framework (roles, levels, modules), and
+- concrete learning content teams can assign and review.
+
+### How it connects courses to the career framework
+
+- Input keywords come from your career framework structure.
+- Each keyword is linked to a track, level, and module type.
+- The system searches and filters courses for that exact context.
+- Output rows keep that mapping so every course is traceable back to framework intent.
+
+### How this supports each function
+
+- **HR:** supports clearer career progression alignment by level and module type.
+- **Sales:** improves visibility of capability-building content tied to role expectations.
+- **Management:** supports planning and gap analysis with a consistent shortlist process.
+
+### Inputs, processing, outputs
+
+- **Inputs:** career-framework keywords from CSV.
+- **Processing:** search, filtering, level mapping, and ranking.
+- **Outputs:** shortlisted courses and a full inspected-course audit trail.
+
+### How to interpret results
+
+- The shortlist is a high-confidence starting point, not a final approval list.
+- Use audit output to understand rejections and tune keywords when needed.
+
+### Recommended run frequency
+
+- Run on a regular cadence (for example monthly or each curriculum planning cycle).
+- Re-run after major framework updates or when launching new skill tracks.
+
+### What it does NOT do
+
+- It does not replace human curriculum judgment.
+- It does not guarantee business fit for every accepted course.
+- It does not automatically assign courses to learners.

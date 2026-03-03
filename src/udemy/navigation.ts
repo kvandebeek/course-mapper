@@ -1,8 +1,10 @@
 /**
- * src/udemy/navigation.ts
+ * Search URL construction and robust navigation primitives.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * Why throttling/retries exist:
+ * Udemy organization search can return transient 403/429/5xx responses. This
+ * module centralizes jittered throttling + retries so callers apply consistent,
+ * observable anti-blocking behavior.
  */
 
 import * as fs from 'node:fs/promises';

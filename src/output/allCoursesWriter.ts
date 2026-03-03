@@ -1,3 +1,10 @@
+/**
+ * Audit CSV writer for every inspected course candidate.
+ *
+ * This writer keeps a traceable stream of `inspected` / `accepted` / `rejected`
+ * outcomes per keyword so reviewers can explain why shortlist rows were kept or
+ * filtered out. Optional per-run dedupe suppresses duplicate status rows.
+ */
 import { appendFile, mkdir, stat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { escapeCsvField } from '../io/incrementalCsvWriter.js';
@@ -40,6 +47,9 @@ export type AllCoursesWriter = {
   close(): Promise<void>;
 };
 
+/**
+ * Initializes the all-courses audit writer.
+ */
 export async function initAllCoursesWriter(
   outputFilePath: string,
   options?: { dedupeMode?: AllCoursesDedupeMode }
