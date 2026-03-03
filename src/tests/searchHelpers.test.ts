@@ -19,7 +19,7 @@ test('shouldStopPagination stops when unique total does not increase', () => {
 
 test('sleepWithJitter uses deterministic midpoint delay', async () => {
   const start = performance.now();
-  await sleepWithJitter(5, 10, 20);
+  await sleepWithJitter(2, 5, 10);
   const elapsed = performance.now() - start;
   assert.ok(elapsed >= 18);
   assert.ok(elapsed < 70);
