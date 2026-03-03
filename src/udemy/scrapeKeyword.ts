@@ -20,6 +20,7 @@ import {
   writeNavigationFailureArtifacts
 } from './navigation.js';
 import { sleepLogged, throttled } from '../utils/throttle.js';
+import { isBlockedByKeyword } from './blockedKeywords.js';
 
 const RESULT_WAIT_TIMEOUT_MS = 25_000;
 const LOAD_MORE_WAIT_TIMEOUT_MS = 10_000;
@@ -30,6 +31,7 @@ export type CourseUrl = string;
 export const REJECTION_REASON = {
   RATING_BELOW_MIN: 'rating_below_min',
   RATING_COUNT_BELOW_MIN: 'rating_count_below_min',
+  BLOCKED_KEYWORD: 'blocked_keyword'
 } as const;
 
 const LOG_EVENT = {
@@ -59,6 +61,20 @@ export type RankedCourseDetail = CourseDetail & Readonly<{
   score: number;
 }>;
 
+
+export type CourseInspectionEvent = Readonly<{
+  keyword: string;
+  courseTitle: string;
+  courseUrl: string;
+  rating: number | null;
+  ratingCount: number | null;
+  courseInstructionalLevel: CourseInstructionalLevel | '';
+  durationMinutes: number | null;
+  lastUpdated: string;
+  status: 'inspected' | 'accepted' | 'rejected';
+  failureReason: string;
+}>;
+
 /**
  * collectCourseUrlsForKeyword: public helper used by other modules.
  */
@@ -71,6 +87,7 @@ export async function collectCourseUrlsForKeyword(
     readonly maxCourses: number;
     readonly maxPages: number;
     readonly throttleMs: number;
+    readonly onCourseInspected?: (event: CourseInspectionEvent) => Promise<void> | void;
   },
   logger: Logger
 ): Promise<readonly DiscoveredCourseCandidate[]> {
@@ -105,7 +122,8 @@ export async function collectCourseUrlsForKeyword(
       opts.maxCourses,
       logger,
       pageIndex,
-      { instructionalLevel: searchInstructionalLevel }
+      { instructionalLevel: searchInstructionalLevel },
+      opts.onCourseInspected
     );
     if (iteration.extractedCount === 0) {
       await dumpEmptySearchHtml(keyword, page, await page.content(), logger, iteration.debug);
@@ -154,6 +172,8 @@ export async function collectAndRankTopCourses(
     readonly maxCourses: number;
     readonly maxPages: number;
     readonly throttleMs: number;
+    readonly onCourseInspected?: (event: CourseInspectionEvent) => Promise<void> | void;
+    readonly onCourseOutcome?: (event: CourseInspectionEvent) => Promise<void> | void;
   },
   logger: Logger
 ): Promise<readonly RankedCourseDetail[]> {
@@ -166,7 +186,10 @@ export async function collectAndRankTopCourses(
   const discoveredCourses: DiscoveredCourseCandidate[] = [];
   for (const instructionalLevel of allowedInstructionalLevels) {
     const levelFilters = { ...opts, allowedInstructionalLevels: [instructionalLevel] as const };
-    const candidates = await collectCourseUrlsForKeyword(page, keyword, levelFilters, logger);
+    const candidates = await collectCourseUrlsForKeyword(page, keyword, {
+      ...levelFilters,
+      ...(opts.onCourseInspected ? { onCourseInspected: opts.onCourseInspected } : {})
+    }, logger);
     logger.debug('Instructional-level pass collected', { keyword, instructionalLevel, searchUrl: buildSearchUrl(keyword, { ...opts.filters, instructionalLevels: [instructionalLevel] }), discoveredCount: candidates.length });
     discoveredCourses.push(...candidates);
   }
@@ -205,6 +228,18 @@ export async function collectAndRankTopCourses(
             diagnosticsTitle: extraction.diagnostics.title,
             primaryContainerSnippet: extraction.diagnostics.primaryContainerSnippet
           });
+          await opts.onCourseOutcome?.({
+            keyword,
+            courseTitle: '',
+            courseUrl,
+            rating: null,
+            ratingCount: null,
+            courseInstructionalLevel: eligibilityContext.instructionalLevel,
+            durationMinutes: null,
+            lastUpdated: '',
+            status: 'rejected',
+            failureReason: extraction.reason
+          });
           continue;
         }
 
@@ -218,6 +253,31 @@ export async function collectAndRankTopCourses(
         courseId: detail.courseId,
         title: detail.title
       });
+
+      const blockedByKeyword = isBlockedByKeyword(detail.title);
+      if (blockedByKeyword.blocked) {
+        rejectionCounts.set(REJECTION_REASON.BLOCKED_KEYWORD, (rejectionCounts.get(REJECTION_REASON.BLOCKED_KEYWORD) ?? 0) + 1);
+        logger.info(LOG_EVENT.COURSE_REJECTED, {
+          keyword,
+          courseUrl,
+          reason: REJECTION_REASON.BLOCKED_KEYWORD,
+          matchedKeyword: blockedByKeyword.matched
+        });
+        await opts.onCourseOutcome?.({
+          keyword,
+          courseTitle: detail.title,
+          courseUrl,
+          rating: detail.rating,
+          ratingCount: detail.ratingCount,
+          courseInstructionalLevel: eligibilityContext.instructionalLevel,
+          durationMinutes: detail.durationTotalMinutes,
+          lastUpdated: '',
+          status: 'rejected',
+          failureReason: REJECTION_REASON.BLOCKED_KEYWORD
+        });
+        continue;
+      }
+
       const eligibility = computeEligibility({
         rating: detail.rating,
         ratingCount: detail.ratingCount
@@ -255,10 +315,34 @@ export async function collectAndRankTopCourses(
         if (scoreResult.isRejected) {
           rejectionCounts.set('instructional level mismatch', (rejectionCounts.get('instructional level mismatch') ?? 0) + 1);
           logger.info(LOG_EVENT.COURSE_REJECTED, { keyword, courseUrl, reason: 'instructional level mismatch' });
+          await opts.onCourseOutcome?.({
+            keyword,
+            courseTitle: detail.title,
+            courseUrl,
+            rating: detail.rating,
+            ratingCount: detail.ratingCount,
+            courseInstructionalLevel: eligibilityContext.instructionalLevel,
+            durationMinutes: detail.durationTotalMinutes,
+            lastUpdated: '',
+            status: 'rejected',
+            failureReason: 'instructional level mismatch'
+          });
           continue;
         }
 
         logger.info('Course accepted', { keyword, courseUrl, courseId: detail.courseId, title: detail.title });
+        await opts.onCourseOutcome?.({
+          keyword,
+          courseTitle: detail.title,
+          courseUrl,
+          rating: detail.rating,
+          ratingCount: detail.ratingCount,
+          courseInstructionalLevel: eligibilityContext.instructionalLevel,
+          durationMinutes: detail.durationTotalMinutes,
+          lastUpdated: '',
+          status: 'accepted',
+          failureReason: ''
+        });
         rankedCourses.push({
           ...detail,
           instructionalLevel: eligibilityContext.instructionalLevel,
@@ -272,6 +356,18 @@ export async function collectAndRankTopCourses(
         });
       } else {
         logger.info(LOG_EVENT.COURSE_REJECTED, { keyword, courseUrl, reason: eligibility.reason });
+        await opts.onCourseOutcome?.({
+          keyword,
+          courseTitle: detail.title,
+          courseUrl,
+          rating: detail.rating,
+          ratingCount: detail.ratingCount,
+          courseInstructionalLevel: eligibilityContext.instructionalLevel,
+          durationMinutes: detail.durationTotalMinutes,
+          lastUpdated: '',
+          status: 'rejected',
+          failureReason: eligibility.reason ?? ''
+        });
         if (eligibility.reason !== null) {
           rejectionCounts.set(eligibility.reason, (rejectionCounts.get(eligibility.reason) ?? 0) + 1);
         }
@@ -281,6 +377,18 @@ export async function collectAndRankTopCourses(
       const slug = courseUrl.split('/course/')[1]?.split('/')[0] ?? 'course';
       await writeNavigationFailureArtifacts(page, `detail_${slug}`, courseUrl, error, keyword);
       logger.warn('Detail extraction failed', { keyword, courseUrl, error: String(error) });
+      await opts.onCourseOutcome?.({
+        keyword,
+        courseTitle: '',
+        courseUrl,
+        rating: null,
+        ratingCount: null,
+        courseInstructionalLevel: eligibilityContext.instructionalLevel,
+        durationMinutes: null,
+        lastUpdated: '',
+        status: 'rejected',
+        failureReason: 'detail extraction failed'
+      });
     }
   }
 
@@ -465,7 +573,8 @@ async function collectSearchIteration(
   maxCourses: number,
   logger: Logger,
   pageIndex: number,
-  eligibilityContext: CourseEligibilityContext
+  eligibilityContext: CourseEligibilityContext,
+  onCourseInspected?: (event: CourseInspectionEvent) => Promise<void> | void
 ): Promise<{ readonly extractedCount: number; readonly addedCount: number; readonly courseLikeAnchorCount: number; readonly debug: HrefDebugDump }> {
   const rawHrefs = await extractRenderedHrefs(page);
   const courseLikeHrefs = rawHrefs.filter((href) => href.includes('/course/'));
@@ -490,6 +599,18 @@ async function collectSearchIteration(
         eligibilityContext
       });
     }
+    await onCourseInspected?.({
+      keyword,
+      courseTitle: '',
+      courseUrl,
+      rating: null,
+      ratingCount: null,
+      courseInstructionalLevel: eligibilityContext.instructionalLevel,
+      durationMinutes: null,
+      lastUpdated: '',
+      status: 'inspected',
+      failureReason: ''
+    });
   }
   const addedCount = unique.size - before;
 
