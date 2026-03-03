@@ -20,6 +20,24 @@ export function sleepMs(ms: number): Promise<void> {
 }
 
 /**
+ * sleepLogged: public helper used by other modules.
+ */
+export async function sleepLogged(
+  ms: number,
+  logger: Logger | undefined,
+  reason: string,
+  operationName?: string
+): Promise<void> {
+  const sleepMsClamped = Math.max(0, ms);
+  logger?.info('Sleep scheduled', {
+    reason,
+    sleepMs: sleepMsClamped,
+    ...(operationName ? { operationName } : {})
+  });
+  await sleepMs(sleepMsClamped);
+}
+
+/**
  * jitterMs: internal utility for this module.
  */
 function jitterMs(baseMs: number, jitterRatio: number): number {
@@ -82,7 +100,7 @@ export async function throttled<T>(fn: () => Promise<T>, opts: ThrottledOptions)
 
   let attempt = 1;
   while (attempt <= maxAttempts) {
-    await sleepMs(jitterMs(opts.throttleMs, jitterRatio));
+    await sleepLogged(jitterMs(opts.throttleMs, jitterRatio), opts.logger, 'throttle', opts.operationName);
 
     try {
       return await fn();
@@ -98,7 +116,7 @@ export async function throttled<T>(fn: () => Promise<T>, opts: ThrottledOptions)
       opts.logger?.warn(
         `Rate limit detected (${signal.type}) during ${opts.operationName}, attempt ${attempt}/${maxAttempts}; backing off ${backoffMs}ms`
       );
-      await sleepMs(backoffMs);
+      await sleepLogged(backoffMs, opts.logger, 'backoff', opts.operationName);
       attempt += 1;
     }
   }
