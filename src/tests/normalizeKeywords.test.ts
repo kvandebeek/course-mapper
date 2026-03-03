@@ -144,3 +144,21 @@ test('normalizeKeywordsFile writes non-empty track values to normalized output',
   assert.ok(trackValues.length > 0);
   assert.ok(trackValues.every((track) => track === 'Pathfinding'));
 });
+
+
+test('keyword dedupe and level code union are case-insensitive for internal keys', () => {
+  const csv = [
+    'Track,Level,Core Modules,AI Modules,Softskills',
+    'Pathfinding,A1 Intern,"AI-Assisted Documentation","",""',
+    'Pathfinding,B1 Practitioner,"ai-assisted documentation","",""'
+  ].join('\n');
+
+  const rows = normalizeKeywordsFromString(csv);
+  const a1 = rows.find((row) => row.level === 'A1 Intern');
+  const b1 = rows.find((row) => row.level === 'B1 Practitioner');
+
+  assert.ok(a1);
+  assert.ok(b1);
+  assert.deepEqual(a1.levelCodes, ['A1', 'B1']);
+  assert.deepEqual(b1.levelCodes, ['A1', 'B1']);
+});
