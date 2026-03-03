@@ -63,8 +63,16 @@ npm test
 - `--profileDir=<path>`
 - `--keywordsFile=<path>`
 - `--normalizedKeywordsFile=<path>`
+- `--durations=<comma-separated>` *(duration buckets: `extraShort`, `short`, `medium`, `long`, `extraLong`; default is `extraShort,short,medium,long` i.e. 0–17h)*
 
 Run `npm run scrape -- --help` for a quick runtime summary.
+
+### Duration filter examples
+
+- Default behavior (0–17h) is applied automatically when no duration filters are specified.
+- Only short courses (1–3h): `npm run scrape -- --durations short`
+- Custom combination: `npm run scrape -- --durations extraShort,medium,long`
+- Include only 17h+ courses: `npm run scrape -- --durations extraLong`
 
 ## Input and output
 
@@ -97,6 +105,8 @@ track,level,levelCodes,moduleType,keyword
 - `courseUrl`
 - `rating`
 - `ratingCount`
+- `duration`
+- `durationTotalMinutes`
 
 ## Reliability and anti-flake design
 

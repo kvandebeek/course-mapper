@@ -7,9 +7,12 @@
 
 import * as path from 'node:path';
 import { BrowserChannel, CliOptions, AppConfig } from './types.js';
+import { DurationBucket } from './udemy/navigation.js';
 
 const DEFAULT_ENGLISH_LOCALES = ['en', 'en_US', 'en_GB'];
 const ALLOWED_BROWSER_CHANNELS: readonly BrowserChannel[] = ['chrome', 'msedge', 'chromium'];
+const ALLOWED_DURATION_BUCKETS = ['extraShort', 'short', 'medium', 'long', 'extraLong'] as const;
+const DEFAULT_DURATION_BUCKETS = ['extraShort', 'short', 'medium', 'long'] as const;
 
 /**
  * parseBoolean: internal utility for this module.
@@ -38,6 +41,24 @@ function parseBrowserChannel(value: string | undefined): BrowserChannel {
     return value as BrowserChannel;
   }
   throw new Error(`Invalid --browserChannel value: ${value}. Allowed values: ${ALLOWED_BROWSER_CHANNELS.join(', ')}`);
+}
+
+/**
+ * parseDurations: internal utility for this module.
+ */
+function parseDurations(value: string | undefined): DurationBucket[] {
+  if (!value) {
+    return [];
+  }
+
+  const parsed = value.split(',').map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+  const invalid = parsed.filter((entry) => !ALLOWED_DURATION_BUCKETS.includes(entry as typeof ALLOWED_DURATION_BUCKETS[number]));
+
+  if (invalid.length > 0) {
+    throw new Error(`Invalid --durations value(s): ${invalid.join(', ')}. Allowed values: ${ALLOWED_DURATION_BUCKETS.join(', ')}`);
+  }
+
+  return parsed as DurationBucket[];
 }
 
 /**
@@ -112,6 +133,9 @@ export function getCliOptions(argv: string[]): CliOptions {
           options.normalizedKeywordsFile = value;
         }
         break;
+      case '--durations':
+        options.durations = parseDurations(value);
+        break;
       default:
         break;
     }
@@ -137,6 +161,9 @@ export function getAppConfig(): AppConfig {
     englishLocales: new Set(DEFAULT_ENGLISH_LOCALES),
     minRating: 4.6,
     minRatingCount: 5000,
+    filters: {
+      durations: DEFAULT_DURATION_BUCKETS
+    }
   };
 }
 

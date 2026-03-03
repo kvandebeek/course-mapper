@@ -33,7 +33,8 @@ function printHelp(): void {
   --concurrency=<number> (default: 1)
   --profileDir=<path>
   --keywordsFile=<path> (default: ./keywords-list.csv)
-  --normalizedKeywordsFile=<path> (default: ./artifacts/keywords.normalized.csv)`);
+  --normalizedKeywordsFile=<path> (default: ./artifacts/keywords.normalized.csv)
+  --durations=<comma-separated buckets> (default: extraShort,short,medium,long)`);
 }
 
 /**
@@ -88,9 +89,10 @@ async function main(): Promise<void> {
 
     const outputCsvPath = resolvePath(config.outputCsvPath);
     await rm(outputCsvPath, { force: true });
+    const durations = cli.durations && cli.durations.length > 0 ? cli.durations : config.filters.durations;
     const writer = createIncrementalCsvWriter({
       outputFilePath: outputCsvPath,
-      headers: ['track', 'level', 'moduleType', 'keyword', 'courseInstructionalLevel', 'courseTitle', 'courseUrl', 'rating', 'ratingCount']
+      headers: ['track', 'level', 'moduleType', 'keyword', 'courseInstructionalLevel', 'courseTitle', 'courseUrl', 'rating', 'ratingCount', 'duration', 'durationTotalMinutes']
     });
 
     const finalRows: ExportRow[] = [];
@@ -108,7 +110,7 @@ async function main(): Promise<void> {
           runtimePage,
           keywordRow.keyword,
           {
-            filters: DEFAULT_FILTERS,
+            filters: { ...DEFAULT_FILTERS, durations },
             allowedInstructionalLevels: getAllowedInstructionalLevels(keywordRow.levelCodes),
             maxCourses: Math.min(cli.maxCoursesPerKeyword, 200),
             maxPages: cli.maxPages,
@@ -127,7 +129,9 @@ async function main(): Promise<void> {
             courseTitle: course.title,
             courseUrl: course.url,
             rating: course.rating ?? 0,
-            ratingCount: course.ratingCount ?? 0
+            ratingCount: course.ratingCount ?? 0,
+            duration: course.durationDisplay ?? '',
+            durationTotalMinutes: course.durationTotalMinutes ?? ''
           };
 
           finalRows.push(row);

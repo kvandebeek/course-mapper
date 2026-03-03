@@ -1,3 +1,5 @@
+import type { DurationBucket } from './udemy/navigation.js';
+
 /**
  * src/types.ts
  *
@@ -16,6 +18,7 @@ export interface CliOptions {
   profileDir: string;
   keywordsFile?: string;
   normalizedKeywordsFile?: string;
+  durations?: DurationBucket[];
 }
 
 export type BrowserChannel = 'chrome' | 'msedge' | 'chromium';
@@ -29,6 +32,9 @@ export interface AppConfig {
   englishLocales: ReadonlySet<string>;
   minRating: number;
   minRatingCount: number;
+  filters: {
+    durations: readonly DurationBucket[];
+  };
 }
 
 export type ModuleType = 'core' | 'ai' | 'softskills';
@@ -51,6 +57,8 @@ export type ExportRow = {
   readonly courseUrl: string;
   readonly rating: number;
   readonly ratingCount: number;
+  readonly duration: string;
+  readonly durationTotalMinutes: number | '';
 };
 
 export interface CourseRaw {
