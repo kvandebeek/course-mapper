@@ -17,6 +17,7 @@ export type DurationBucket = 'extraShort' | 'short' | 'medium' | 'long' | 'extra
 
 export interface SearchFilters {
   readonly minRating?: number;
+  readonly kw?: string;
   readonly lang?: string;
   readonly instructionalLevels?: readonly InstructionalLevel[];
   readonly durations?: readonly DurationBucket[];
@@ -24,38 +25,50 @@ export interface SearchFilters {
 }
 
 export const UDEMY_ORIGIN = 'https://resillion.udemy.com' as const;
+const PARAM_SRC = 'src';
+const PARAM_Q = 'q';
+const PARAM_RATINGS = 'ratings';
+const PARAM_KW = 'kw';
+const PARAM_LANG = 'lang';
+const PARAM_INSTRUCTIONAL_LEVEL = 'instructional_level';
+const PARAM_DURATION = 'duration';
+const PARAM_SORT = 'sort';
 
 /**
  * buildSearchUrl: public helper used by other modules.
  */
 export function buildSearchUrl(keyword: string, filters: SearchFilters): string {
   const url = new URL('/organization/search/', UDEMY_ORIGIN);
-  url.searchParams.set('src', 'ukw');
-  url.searchParams.set('q', keyword);
+  url.searchParams.set(PARAM_SRC, 'ukw');
+  url.searchParams.set(PARAM_Q, keyword);
 
   if (typeof filters.minRating === 'number' && Number.isFinite(filters.minRating)) {
     const rounded = (Math.round(filters.minRating * 10) / 10).toFixed(1);
-    url.searchParams.set('ratings', rounded);
+    url.searchParams.set(PARAM_RATINGS, rounded);
+  }
+
+  if (filters.kw) {
+    url.searchParams.set(PARAM_KW, filters.kw);
   }
 
   if (filters.lang) {
-    url.searchParams.set('lang', filters.lang);
+    url.searchParams.set(PARAM_LANG, filters.lang);
   }
 
   if (filters.instructionalLevels && filters.instructionalLevels.length > 0) {
     for (const level of filters.instructionalLevels) {
-      url.searchParams.append('instructional_level', level);
+      url.searchParams.append(PARAM_INSTRUCTIONAL_LEVEL, level);
     }
   }
 
   if (filters.durations && filters.durations.length > 0) {
     for (const bucket of filters.durations) {
-      url.searchParams.append('duration', bucket);
+      url.searchParams.append(PARAM_DURATION, bucket);
     }
   }
 
   if (filters.sort) {
-    url.searchParams.set('sort', filters.sort);
+    url.searchParams.set(PARAM_SORT, filters.sort);
   }
 
   return url.toString();

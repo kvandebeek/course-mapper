@@ -92,6 +92,35 @@ test('computeEligibility rejects missing or disallowed instructional levels when
   );
 });
 
+
+
+test('buildSearchUrl rounds minRating down to one decimal for ratings param', () => {
+  const url = buildSearchUrl('python', {
+    minRating: 4.64
+  });
+
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get('ratings'), '4.6');
+});
+
+test('buildSearchUrl rounds minRating up to one decimal for ratings param', () => {
+  const url = buildSearchUrl('python', {
+    minRating: 4.65
+  });
+
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get('ratings'), '4.7');
+});
+
+test('buildSearchUrl appends kw when provided', () => {
+  const url = buildSearchUrl('qa automation', {
+    kw: 'qa'
+  });
+
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get('kw'), 'qa');
+});
+
 test('buildSearchUrl appends multiple instructional_level params', () => {
   const url = buildSearchUrl('python', {
     minRating: 4.6,
@@ -105,9 +134,10 @@ test('buildSearchUrl appends multiple instructional_level params', () => {
 });
 
 
-test('buildSearchUrl appends repeated duration params while preserving existing params', () => {
+test('buildSearchUrl includes kw with repeated duration and instructional_level params', () => {
   const url = buildSearchUrl('python', {
     minRating: 4.6,
+    kw: 'qa',
     lang: 'en',
     instructionalLevels: ['beginner', 'intermediate'],
     durations: ['extraShort', 'medium', 'long'],
@@ -117,5 +147,7 @@ test('buildSearchUrl appends repeated duration params while preserving existing 
   const parsed = new URL(url);
   assert.deepEqual(parsed.searchParams.getAll('duration'), ['extraShort', 'medium', 'long']);
   assert.deepEqual(parsed.searchParams.getAll('instructional_level'), ['beginner', 'intermediate']);
+  assert.equal(parsed.searchParams.get('kw'), 'qa');
   assert.equal(parsed.searchParams.get('sort'), 'relevance');
+  assert.equal(url, 'https://resillion.udemy.com/organization/search/?src=ukw&q=python&ratings=4.6&kw=qa&lang=en&instructional_level=beginner&instructional_level=intermediate&duration=extraShort&duration=medium&duration=long&sort=relevance');
 });
