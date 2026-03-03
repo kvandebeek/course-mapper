@@ -84,6 +84,8 @@ Run `npm run scrape -- --help` for a quick runtime summary.
 Track,Level,Core Modules,AI Modules,Softskills
 ```
 
+`Track` header matching is case-insensitive for compatibility (`Track` or `track` are accepted), but a non-empty track value is required on the first row for normalization.
+
 The normalization step writes `artifacts/keywords.normalized.csv` with headers:
 
 ```csv

@@ -12,11 +12,11 @@ import { initAuthenticatedSession } from './auth.js';
 import { ExportRow } from './types.js';
 import { createSessionManager } from './runtime/sessionManager.js';
 import { DEFAULT_FILTERS, collectAndRankTopCourses } from './udemy/scrapeKeyword.js';
-import { mapUdemyInstructionalLevel } from './udemy/instructionalLevel.js';
 import { enforceSameTabNavigation } from './udemy/navigation.js';
 import { ensureNormalizedKeywords } from './keywords/ensureNormalizedKeywords.js';
 import { loadNormalizedKeywords } from './keywords/loadNormalizedKeywords.js';
 import { createIncrementalCsvWriter } from './io/incrementalCsvWriter.js';
+import { buildExportRow } from './results/buildExportRow.js';
 import { getAllowedInstructionalLevels } from './levels/frameworkLevelMapping.js';
 
 /**
@@ -120,19 +120,7 @@ async function main(): Promise<void> {
         );
 
         for (const course of topCourses) {
-          const row: ExportRow = {
-            track: keywordRow.track,
-            level: keywordRow.level,
-            moduleType: keywordRow.moduleType,
-            keyword: keywordRow.keyword,
-            courseInstructionalLevel: mapUdemyInstructionalLevel(course.udemyLevel ?? '') ?? 'all',
-            courseTitle: course.title,
-            courseUrl: course.url,
-            rating: course.rating ?? 0,
-            ratingCount: course.ratingCount ?? 0,
-            duration: course.durationDisplay ?? '',
-            durationTotalMinutes: course.durationTotalMinutes ?? ''
-          };
+          const row = buildExportRow(keywordRow, course);
 
           finalRows.push(row);
 

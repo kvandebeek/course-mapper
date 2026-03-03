@@ -68,3 +68,38 @@ test('keyword appearing at multiple levels stores union of level codes in stable
     { track: 'Path', level: 'C1', levelCodes: ['B1', 'C1'], moduleType: 'core', keyword: 'Shared' }
   ]);
 });
+
+
+test('normalization preserves Track for sample row used in scraper input', () => {
+  const csv = [
+    'Track,Level,Core Modules,AI Modules,Softskills',
+    'Pathfinding,A1 Intern,"Introduction to Testing, Test Case Design, Exploratory Testing, Git, Intro Programming, Shadowing","Intro to AI in Testing, Prompt Engineering Basics, GenAI for Test Case Drafting, AI-Assisted Documentation","Professional Communication Basics, Active Listening, Time Management, Growth Mindset, Collaboration in Agile Teams, Basic Presentation Skills"'
+  ].join('\n');
+
+  const rows = normalizeKeywordsFromString(csv);
+  const target = rows.find((row) => row.keyword === 'AI-Assisted Documentation' && row.moduleType === 'ai');
+
+  assert.ok(target);
+  assert.equal(target.track, 'Pathfinding');
+  assert.equal(target.level, 'A1 Intern');
+});
+
+test('supports lowercase track header and throws when first row track is missing', () => {
+  const lowercaseHeaderCsv = [
+    'track,Level,Core Modules,AI Modules,Softskills',
+    'Pathfinding,A1 Intern,"Core 1","AI 1","Soft 1"'
+  ].join('\n');
+
+  const lowercaseRows = normalizeKeywordsFromString(lowercaseHeaderCsv);
+  assert.equal(lowercaseRows[0]?.track, 'Pathfinding');
+
+  const missingTrackCsv = [
+    'Track,Level,Core Modules,AI Modules,Softskills',
+    ',A1 Intern,"Core 1","AI 1","Soft 1"'
+  ].join('\n');
+
+  assert.throws(
+    () => normalizeKeywordsFromString(missingTrackCsv),
+    /Missing required track value at source keyword row 2\. Available keys:/
+  );
+});
