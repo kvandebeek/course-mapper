@@ -5,7 +5,6 @@
  * quickly understand where it sits in the scraping pipeline.
  */
 
-import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Page, Response } from 'playwright';
@@ -47,9 +46,10 @@ export function shouldStopPagination(previousUniqueTotal: number, newUniqueTotal
  * sleepWithJitter: public helper used by other modules.
  */
 export async function sleepWithJitter(baseMs: number, jitterMinMs: number, jitterMaxMs: number): Promise<void> {
-  const jitterSpan = Math.max(0, jitterMaxMs - jitterMinMs);
-  const randomInt = jitterSpan === 0 ? 0 : crypto.randomInt(0, jitterSpan + 1);
-  const delayMs = Math.max(0, baseMs + jitterMinMs + randomInt);
+  const boundedJitterMin = Math.max(0, jitterMinMs);
+  const boundedJitterMax = Math.max(boundedJitterMin, jitterMaxMs);
+  const deterministicJitter = Math.floor((boundedJitterMin + boundedJitterMax) / 2);
+  const delayMs = Math.max(0, baseMs + deterministicJitter);
   await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 

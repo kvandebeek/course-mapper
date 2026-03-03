@@ -10,6 +10,8 @@ import * as path from 'node:path';
 import { Page } from 'playwright';
 import { Logger } from '../logger.js';
 import { extractCourseDetail, CourseDetail } from './extractCourseDetail.js';
+import { CareerLevel, CourseInstructionalLevel, LEVEL_TO_INSTRUCTIONAL } from '../levels/careerLevel.js';
+import { scoreCourseForCareerLevel } from '../scoring/courseScorer.js';
 import {
   InstructionalLevel,
   SearchFilters,
@@ -44,12 +46,17 @@ export const DEFAULT_FILTERS: SearchFilters = {
 export type AllowedInstructionalLevel = Exclude<InstructionalLevel, 'all'>;
 
 export type CourseEligibilityContext = Readonly<{
-  requestedInstructionalLevels: readonly InstructionalLevel[];
+  instructionalLevel: CourseInstructionalLevel;
 }>;
 
 export type DiscoveredCourseCandidate = Readonly<{
   courseUrl: CourseUrl;
   eligibilityContext: CourseEligibilityContext;
+}>;
+
+export type RankedCourseDetail = CourseDetail & Readonly<{
+  instructionalLevel: CourseInstructionalLevel;
+  score: number;
 }>;
 
 /**
@@ -70,12 +77,15 @@ export async function collectCourseUrlsForKeyword(
   const mergedFilters: SearchFilters = opts.allowedInstructionalLevels && opts.allowedInstructionalLevels.length > 0
     ? { ...opts.filters, instructionalLevels: opts.allowedInstructionalLevels }
     : opts.filters;
+  const searchInstructionalLevel = mergedFilters.instructionalLevels?.[0] ?? null;
+  if (!searchInstructionalLevel || searchInstructionalLevel === 'all') {
+    throw new Error('collectCourseUrlsForKeyword requires exactly one instructional level per search pass');
+  }
   const baseSearchUrl = buildSearchUrl(keyword, mergedFilters);
   logger.info('Keyword URL collection started', { keyword, baseSearchUrl });
 
   const unique = new Map<CourseUrl, DiscoveredCourseCandidate>();
-  const requestedInstructionalLevels = [...(mergedFilters.instructionalLevels ?? [])] satisfies InstructionalLevel[];
-  logger.info('Applying instructional_level search filters', { keyword, requestedInstructionalLevels });
+  logger.info('Applying instructional_level search filter', { keyword, instructionalLevel: searchInstructionalLevel });
 
   try {
     await gotoWithRetries(page, baseSearchUrl, { operationName: 'openSearchPage', throttleMs: opts.throttleMs, logger });
@@ -95,7 +105,7 @@ export async function collectCourseUrlsForKeyword(
       opts.maxCourses,
       logger,
       pageIndex,
-      { requestedInstructionalLevels }
+      { instructionalLevel: searchInstructionalLevel }
     );
     if (iteration.extractedCount === 0) {
       await dumpEmptySearchHtml(keyword, page, await page.content(), logger, iteration.debug);
@@ -137,6 +147,7 @@ export async function collectCourseUrlsForKeyword(
 export async function collectAndRankTopCourses(
   page: Page,
   keyword: string,
+  careerLevel: CareerLevel,
   opts: {
     readonly filters: SearchFilters;
     readonly allowedInstructionalLevels?: readonly AllowedInstructionalLevel[];
@@ -145,44 +156,62 @@ export async function collectAndRankTopCourses(
     readonly throttleMs: number;
   },
   logger: Logger
-): Promise<readonly CourseDetail[]> {
-  const discoveredCourses = await collectCourseUrlsForKeyword(page, keyword, opts, logger);
+): Promise<readonly RankedCourseDetail[]> {
+  const allowedInstructionalLevels = opts.allowedInstructionalLevels && opts.allowedInstructionalLevels.length > 0
+    ? opts.allowedInstructionalLevels
+    : LEVEL_TO_INSTRUCTIONAL[careerLevel];
+
+  logger.debug('Keyword instructional mapping', { keyword, careerLevel, allowedInstructionalLevels });
+
+  const discoveredCourses: DiscoveredCourseCandidate[] = [];
+  for (const instructionalLevel of allowedInstructionalLevels) {
+    const levelFilters = { ...opts, allowedInstructionalLevels: [instructionalLevel] as const };
+    const candidates = await collectCourseUrlsForKeyword(page, keyword, levelFilters, logger);
+    logger.debug('Instructional-level pass collected', { keyword, instructionalLevel, searchUrl: buildSearchUrl(keyword, { ...opts.filters, instructionalLevels: [instructionalLevel] }), discoveredCount: candidates.length });
+    discoveredCourses.push(...candidates);
+  }
 
   if (discoveredCourses.length === 0) {
     logger.info('Keyword completed with no course URLs found', { keyword, reason: 'no course URLs found' });
     return [];
   }
 
-  const details: CourseDetail[] = [];
+  const detailCache = new Map<string, CourseDetail>();
+  const rankedCourses: RankedCourseDetail[] = [];
   const rejectionCounts = new Map<string, number>();
 
   for (const discoveredCourse of discoveredCourses) {
-    const { courseUrl } = discoveredCourse;
-    try {
+      const { courseUrl, eligibilityContext } = discoveredCourse;
+      try {
       logger.debug('Detail extraction entrypoint', {
         keyword,
         courseUrl,
         extractor: 'src/udemy/extractCourseDetail.ts:extractCourseDetail'
       });
-      await sleepLogged(900, logger, 'pre-detail-navigation', 'openDetailPage');
-      await gotoWithRetries(page, courseUrl, { operationName: 'openDetailPage', throttleMs: opts.throttleMs, logger });
-      logger.info('Opening detail page', { keyword, courseUrl, currentUrl: page.url() });
+      let detail = detailCache.get(courseUrl);
+      if (!detail) {
+        await sleepLogged(900, logger, 'pre-detail-navigation', 'openDetailPage');
+        await gotoWithRetries(page, courseUrl, { operationName: 'openDetailPage', throttleMs: opts.throttleMs, logger });
+        logger.info('Opening detail page', { keyword, courseUrl, currentUrl: page.url() });
 
-      const extraction = await extractCourseDetail(page, keyword, courseUrl);
-      if (!extraction.ok) {
-        rejectionCounts.set('detail extraction failed', (rejectionCounts.get('detail extraction failed') ?? 0) + 1);
-        logger.warn('Detail extraction failed', {
-          keyword,
-          courseUrl,
-          reason: extraction.reason,
-          diagnosticsUrl: extraction.diagnostics.url,
-          diagnosticsTitle: extraction.diagnostics.title,
-          primaryContainerSnippet: extraction.diagnostics.primaryContainerSnippet
-        });
-        continue;
+        const extraction = await extractCourseDetail(page, keyword, courseUrl);
+        if (!extraction.ok) {
+          rejectionCounts.set('detail extraction failed', (rejectionCounts.get('detail extraction failed') ?? 0) + 1);
+          logger.warn('Detail extraction failed', {
+            keyword,
+            courseUrl,
+            reason: extraction.reason,
+            diagnosticsUrl: extraction.diagnostics.url,
+            diagnosticsTitle: extraction.diagnostics.title,
+            primaryContainerSnippet: extraction.diagnostics.primaryContainerSnippet
+          });
+          continue;
+        }
+
+        detail = extraction.data;
+        detailCache.set(courseUrl, detail);
       }
 
-      const detail = extraction.data;
       logger.info('Extracting detail fields completed', {
         keyword,
         courseUrl,
@@ -215,8 +244,32 @@ export async function collectAndRankTopCourses(
       });
 
       if (eligibility.eligible) {
+        const scoreResult = scoreCourseForCareerLevel(careerLevel, {
+          rating: detail.rating ?? 0,
+          ratingCount: detail.ratingCount ?? 0,
+          instructionalLevel: eligibilityContext.instructionalLevel,
+          courseUrl,
+          courseTitle: detail.title
+        });
+
+        if (scoreResult.isRejected) {
+          rejectionCounts.set('instructional level mismatch', (rejectionCounts.get('instructional level mismatch') ?? 0) + 1);
+          logger.info(LOG_EVENT.COURSE_REJECTED, { keyword, courseUrl, reason: 'instructional level mismatch' });
+          continue;
+        }
+
         logger.info('Course accepted', { keyword, courseUrl, courseId: detail.courseId, title: detail.title });
-        details.push(detail);
+        rankedCourses.push({
+          ...detail,
+          instructionalLevel: eligibilityContext.instructionalLevel,
+          score: scoreResult.score
+        });
+        logger.debug('Course score breakdown', {
+          keyword,
+          courseUrl,
+          score: scoreResult.score,
+          reasons: scoreResult.reasons
+        });
       } else {
         logger.info(LOG_EVENT.COURSE_REJECTED, { keyword, courseUrl, reason: eligibility.reason });
         if (eligibility.reason !== null) {
@@ -231,7 +284,9 @@ export async function collectAndRankTopCourses(
     }
   }
 
-  if (details.length === 0) {
+  const dedupedRankedCourses = dedupeRankedCoursesByUrl(rankedCourses);
+
+  if (dedupedRankedCourses.length === 0) {
     logger.info('Keyword completed with all courses filtered out', {
       keyword,
       reason: 'all filtered out',
@@ -239,7 +294,19 @@ export async function collectAndRankTopCourses(
     });
   }
 
-  return rankCourses(details).slice(0, 3);
+  const sorted = rankCourses(dedupedRankedCourses).slice(0, opts.maxCourses);
+  for (const course of sorted.slice(0, 5)) {
+    logger.debug('Top candidate after scoring', {
+      keyword,
+      courseUrl: course.url,
+      score: course.score,
+      instructionalLevel: course.instructionalLevel,
+      rating: course.rating,
+      ratingCount: course.ratingCount
+    });
+  }
+
+  return sorted;
 }
 
 export type FailureReason = (typeof REJECTION_REASON)[keyof typeof REJECTION_REASON];
@@ -278,15 +345,38 @@ export function computeEligibility(
 /**
  * rankCourses: internal utility for this module.
  */
-function rankCourses(courses: readonly CourseDetail[]): CourseDetail[] {
+function rankCourses(courses: readonly RankedCourseDetail[]): RankedCourseDetail[] {
   return [...courses].sort((a, b) => {
+    const scoreCmp = compareNumberDesc(a.score, b.score);
+    if (scoreCmp !== 0) {
+      return scoreCmp;
+    }
+
     const ratingCmp = compareNumberDesc(a.rating, b.rating);
     if (ratingCmp !== 0) {
       return ratingCmp;
     }
 
-    return compareNumberDesc(a.ratingCount, b.ratingCount);
+    const ratingCountCmp = compareNumberDesc(a.ratingCount, b.ratingCount);
+    if (ratingCountCmp !== 0) {
+      return ratingCountCmp;
+    }
+
+    return a.url.localeCompare(b.url);
   });
+}
+
+function dedupeRankedCoursesByUrl(courses: readonly RankedCourseDetail[]): RankedCourseDetail[] {
+  const sorted = rankCourses(courses);
+  const byUrl = new Map<string, RankedCourseDetail>();
+
+  for (const course of sorted) {
+    if (!byUrl.has(course.url)) {
+      byUrl.set(course.url, course);
+    }
+  }
+
+  return [...byUrl.values()];
 }
 
 /**
