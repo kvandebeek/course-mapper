@@ -13,6 +13,7 @@ const DEFAULT_ENGLISH_LOCALES = ['en', 'en_US', 'en_GB'];
 const ALLOWED_BROWSER_CHANNELS: readonly BrowserChannel[] = ['chrome', 'msedge', 'chromium'];
 const ALLOWED_DURATION_BUCKETS = ['extraShort', 'short', 'medium', 'long', 'extraLong'] as const;
 const DEFAULT_DURATION_BUCKETS = ['extraShort', 'short', 'medium', 'long'] as const;
+const ALLOWED_ALL_COURSES_DEDUPE = ['none', 'perRun'] as const;
 
 /**
  * parseBoolean: internal utility for this module.
@@ -62,6 +63,21 @@ function parseDurations(value: string | undefined): DurationBucket[] {
 }
 
 /**
+ * parseAllCoursesDedupe: internal utility for this module.
+ */
+function parseAllCoursesDedupe(value: string | undefined): 'none' | 'perRun' {
+  if (!value) {
+    return 'none';
+  }
+
+  if (ALLOWED_ALL_COURSES_DEDUPE.includes(value as typeof ALLOWED_ALL_COURSES_DEDUPE[number])) {
+    return value as 'none' | 'perRun';
+  }
+
+  throw new Error(`Invalid --allCoursesDedupe value: ${value}. Allowed values: ${ALLOWED_ALL_COURSES_DEDUPE.join(', ')}`);
+}
+
+/**
  * getCliOptions: public helper used by other modules.
  */
 export function getCliOptions(argv: string[]): CliOptions {
@@ -73,7 +89,8 @@ export function getCliOptions(argv: string[]): CliOptions {
     maxPages: 15,
     throttleMs: 500,
     concurrency: 1,
-    profileDir: './artifacts/profile'
+    profileDir: './artifacts/profile',
+    allCoursesDedupe: 'none'
   };
 
   for (let i = 2; i < argv.length; i += 1) {
@@ -135,6 +152,9 @@ export function getCliOptions(argv: string[]): CliOptions {
         break;
       case '--durations':
         options.durations = parseDurations(value);
+        break;
+      case '--allCoursesDedupe':
+        options.allCoursesDedupe = parseAllCoursesDedupe(value);
         break;
       default:
         break;

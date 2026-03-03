@@ -16,6 +16,7 @@ import { enforceSameTabNavigation } from './udemy/navigation.js';
 import { ensureNormalizedKeywords } from './keywords/ensureNormalizedKeywords.js';
 import { loadNormalizedKeywords } from './keywords/loadNormalizedKeywords.js';
 import { createIncrementalCsvWriter } from './io/incrementalCsvWriter.js';
+import { initAllCoursesWriter } from './output/allCoursesWriter.js';
 import { buildExportRow } from './results/buildExportRow.js';
 import { parseCareerLevel, LEVEL_TO_INSTRUCTIONAL } from './levels/careerLevel.js';
 
@@ -34,7 +35,8 @@ function printHelp(): void {
   --profileDir=<path>
   --keywordsFile=<path> (default: ./keywords-list.csv)
   --normalizedKeywordsFile=<path> (default: ./artifacts/keywords.normalized.csv)
-  --durations=<comma-separated buckets> (default: extraShort,short,medium,long)`);
+  --durations=<comma-separated buckets> (default: extraShort,short,medium,long)
+  --allCoursesDedupe=none|perRun (default: none)`);
 }
 
 /**
@@ -95,6 +97,22 @@ async function main(): Promise<void> {
       headers: ['track', 'level', 'moduleType', 'keyword', 'courseInstructionalLevel', 'courseTitle', 'courseUrl', 'rating', 'ratingCount', 'duration', 'durationTotalMinutes']
     });
 
+    const runId = new Date().toISOString();
+    const allCoursesPath = resolvePath('./artifacts/udemy/all_courses.csv');
+    const allCoursesWriter = await initAllCoursesWriter(allCoursesPath, { dedupeMode: cli.allCoursesDedupe ?? 'none' });
+    const allCoursesCounts = {
+      inspected: 0,
+      accepted: 0,
+      rejected: 0
+    };
+
+    logger.info('All courses audit log initialized', {
+      path: allCoursesWriter.outputFilePath,
+      mode: allCoursesWriter.fileExisted ? 'append' : 'created',
+      runId,
+      dedupeMode: cli.allCoursesDedupe ?? 'none'
+    });
+
     const finalRows: ExportRow[] = [];
 
     for (const keywordRow of keywords) {
@@ -132,7 +150,48 @@ async function main(): Promise<void> {
             allowedInstructionalLevels,
             maxCourses: Math.min(cli.maxCoursesPerKeyword, 200),
             maxPages: cli.maxPages,
-            throttleMs: cli.throttleMs
+            throttleMs: cli.throttleMs,
+            onCourseInspected: async (event) => {
+              const appended = await allCoursesWriter.appendInspectedCourse({
+                runId,
+                keyword: event.keyword,
+                courseTitle: event.courseTitle,
+                courseUrl: event.courseUrl,
+                rating: event.rating ?? '',
+                ratingCount: event.ratingCount ?? '',
+                courseInstructionalLevel: event.courseInstructionalLevel,
+                durationMinutes: event.durationMinutes ?? '',
+                lastUpdated: event.lastUpdated,
+                status: event.status,
+                failureReason: event.failureReason
+              });
+              if (appended) {
+                allCoursesCounts.inspected += 1;
+              }
+            },
+            onCourseOutcome: async (event) => {
+              const appended = await allCoursesWriter.appendInspectedCourse({
+                runId,
+                keyword: event.keyword,
+                courseTitle: event.courseTitle,
+                courseUrl: event.courseUrl,
+                rating: event.rating ?? '',
+                ratingCount: event.ratingCount ?? '',
+                courseInstructionalLevel: event.courseInstructionalLevel,
+                durationMinutes: event.durationMinutes ?? '',
+                lastUpdated: event.lastUpdated,
+                status: event.status,
+                failureReason: event.failureReason
+              });
+              if (!appended) {
+                return;
+              }
+              if (event.status === 'accepted') {
+                allCoursesCounts.accepted += 1;
+              } else if (event.status === 'rejected') {
+                allCoursesCounts.rejected += 1;
+              }
+            }
           },
           logger
         );
@@ -174,6 +233,16 @@ async function main(): Promise<void> {
         });
       }
     }
+
+    await allCoursesWriter.close();
+
+    logger.info('All courses audit log summary', {
+      path: allCoursesWriter.outputFilePath,
+      runId,
+      inspectedRowsAppended: allCoursesCounts.inspected,
+      acceptedRowsAppended: allCoursesCounts.accepted,
+      rejectedRowsAppended: allCoursesCounts.rejected
+    });
 
     logger.info('Run complete', {
       rows: finalRows.length,

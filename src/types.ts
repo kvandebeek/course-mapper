@@ -1,4 +1,5 @@
 import type { DurationBucket } from './udemy/navigation.js';
+import type { AllCoursesDedupeMode } from './output/allCoursesWriter.js';
 
 /**
  * src/types.ts
@@ -19,6 +20,7 @@ export interface CliOptions {
   keywordsFile?: string;
   normalizedKeywordsFile?: string;
   durations?: DurationBucket[];
+  allCoursesDedupe?: AllCoursesDedupeMode;
 }
 
 export type BrowserChannel = 'chrome' | 'msedge' | 'chromium';
