@@ -23,9 +23,7 @@ export interface NormalizedKeywordRow {
 
 interface SourceKeywordCsvRow {
   readonly Track?: string;
-  readonly track?: string;
   readonly Level?: string;
-  readonly level?: string;
   readonly 'Core Modules'?: string;
   readonly 'AI Modules'?: string;
   readonly Softskills?: string;
@@ -42,6 +40,30 @@ const MODULE_FIELDS: readonly { readonly field: keyof SourceKeywordCsvRow; reado
   { field: 'Softskills', moduleType: 'softskills' }
 ];
 
+const SOURCE_HEADER_ALIASES: Readonly<Record<string, keyof SourceKeywordCsvRow>> = {
+  track: 'Track',
+  level: 'Level',
+  'core modules': 'Core Modules',
+  'ai modules': 'AI Modules',
+  softskills: 'Softskills'
+};
+
+/**
+ * stripBom: internal utility for this module.
+ */
+function stripBom(value: string): string {
+  return value.replace(/^\uFEFF/, '');
+}
+
+/**
+ * normalizeHeader: internal utility for this module.
+ */
+function normalizeHeader(value: string): string {
+  const cleaned = stripBom(value).trim();
+  const canonical = SOURCE_HEADER_ALIASES[cleaned.toLowerCase()];
+  return canonical ?? cleaned;
+}
+
 /**
  * hasExpectedHeaders: internal utility for this module.
  */
@@ -53,7 +75,7 @@ function hasExpectedHeaders(rows: readonly SourceKeywordCsvRow[]): boolean {
   if (sample === undefined) {
     return false;
   }
-  return (Object.hasOwn(sample, 'Track') || Object.hasOwn(sample, 'track')) && (Object.hasOwn(sample, 'Level') || Object.hasOwn(sample, 'level'));
+  return Object.hasOwn(sample, 'Track') && Object.hasOwn(sample, 'Level');
 }
 
 /**
@@ -64,7 +86,7 @@ function parseSourceRows(content: string): readonly SourceKeywordCsvRow[] {
 
   try {
     semicolonRows = parseCsv(content, {
-      columns: true,
+      columns: (header: string[]) => header.map((value) => normalizeHeader(value)),
       skip_empty_lines: true,
       trim: true,
       delimiter: ';'
@@ -78,7 +100,7 @@ function parseSourceRows(content: string): readonly SourceKeywordCsvRow[] {
   }
 
   return parseCsv(content, {
-    columns: true,
+    columns: (header: string[]) => header.map((value) => normalizeHeader(value)),
     skip_empty_lines: true,
     trim: true,
     delimiter: ','
@@ -123,7 +145,7 @@ function compareNormalizedRows(a: NormalizedKeywordRow, b: NormalizedKeywordRow)
  * readRequiredTrack: internal utility for this module.
  */
 function readRequiredTrack(row: SourceKeywordCsvRow, rowIndex: number, currentTrack: string): string {
-  const trackCandidates = [row.Track, row.track]
+  const trackCandidates = [row.Track]
     .map((value) => (value ?? '').trim())
     .filter((value) => value.length > 0);
 
@@ -145,7 +167,7 @@ function readRequiredTrack(row: SourceKeywordCsvRow, rowIndex: number, currentTr
  * readLevelValue: internal utility for this module.
  */
 function readLevelValue(row: SourceKeywordCsvRow): string {
-  const levelCandidates = [row.Level, row.level]
+  const levelCandidates = [row.Level]
     .map((value) => (value ?? '').trim())
     .filter((value) => value.length > 0);
   return levelCandidates[0] ?? '';
