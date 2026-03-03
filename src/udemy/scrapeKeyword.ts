@@ -20,6 +20,7 @@ import {
   writeNavigationFailureArtifacts
 } from './navigation.js';
 import { sleepLogged, throttled } from '../utils/throttle.js';
+import { isBlockedByKeyword } from './blockedKeywords.js';
 
 const RESULT_WAIT_TIMEOUT_MS = 25_000;
 const LOAD_MORE_WAIT_TIMEOUT_MS = 10_000;
@@ -30,6 +31,7 @@ export type CourseUrl = string;
 export const REJECTION_REASON = {
   RATING_BELOW_MIN: 'rating_below_min',
   RATING_COUNT_BELOW_MIN: 'rating_count_below_min',
+  BLOCKED_KEYWORD: 'blocked_keyword'
 } as const;
 
 const LOG_EVENT = {
@@ -218,6 +220,19 @@ export async function collectAndRankTopCourses(
         courseId: detail.courseId,
         title: detail.title
       });
+
+      const blockedByKeyword = isBlockedByKeyword(detail.title);
+      if (blockedByKeyword.blocked) {
+        rejectionCounts.set(REJECTION_REASON.BLOCKED_KEYWORD, (rejectionCounts.get(REJECTION_REASON.BLOCKED_KEYWORD) ?? 0) + 1);
+        logger.info(LOG_EVENT.COURSE_REJECTED, {
+          keyword,
+          courseUrl,
+          reason: REJECTION_REASON.BLOCKED_KEYWORD,
+          matchedKeyword: blockedByKeyword.matched
+        });
+        continue;
+      }
+
       const eligibility = computeEligibility({
         rating: detail.rating,
         ratingCount: detail.ratingCount

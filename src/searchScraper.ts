@@ -19,6 +19,7 @@ import {
   waitForResponseOrClose
 } from './udemy/searchTransport.js';
 import { UnknownRecord, isRecord, tryExtractHits } from './udemy/types.js';
+import { isBlockedByKeyword } from './udemy/blockedKeywords.js';
 
 interface SearchParams {
   readonly maxCoursesPerKeyword: number;
@@ -64,7 +65,7 @@ export async function isSearchUnavailable(page: Page): Promise<boolean> {
 /**
  * extractCoursesFromDom: public helper used by other modules.
  */
-export async function extractCoursesFromDom(page: Page): Promise<readonly SearchResultPayload[]> {
+export async function extractCoursesFromDom(page: Page, logger?: Logger): Promise<readonly SearchResultPayload[]> {
   const cards = page.locator('[data-testid="course-card-title"], [data-purpose="search-course-card-title"]');
   const count = await cards.count();
   const found: SearchResultPayload[] = [];
@@ -80,6 +81,16 @@ export async function extractCoursesFromDom(page: Page): Promise<readonly Search
     }
 
     const normalizedUrl = normalizeUrl(absoluteHref);
+    const blockedByKeyword = isBlockedByKeyword(title);
+    if (blockedByKeyword.blocked) {
+      logger?.info('Course rejected', {
+        courseUrl: normalizedUrl,
+        reason: 'blocked_keyword',
+        matchedKeyword: blockedByKeyword.matched
+      });
+      continue;
+    }
+
     const id = normalizedUrl.split('/course/')[1]?.split('/')[0] ?? normalizedUrl;
     found.push({
       id,
@@ -215,13 +226,28 @@ async function extractViaApiOrDom(
       const payload = await safeJson(response);
       const hits = payload ? tryExtractHits(payload) : undefined;
       if (hits && hits.length > 0) {
-        return hits.map(mapHitToSearchPayload).filter((item): item is SearchResultPayload => item !== null);
+        return hits
+          .map(mapHitToSearchPayload)
+          .filter((item): item is SearchResultPayload => item !== null)
+          .filter((item) => {
+            const blockedByKeyword = isBlockedByKeyword(item.title);
+            if (!blockedByKeyword.blocked) {
+              return true;
+            }
+
+            logger.info('Course rejected', {
+              courseUrl: item.url,
+              reason: 'blocked_keyword',
+              matchedKeyword: blockedByKeyword.matched
+            });
+            return false;
+          });
       }
     }
   }
 
   logger.warn('API response capture failed; using DOM fallback', { keyword, pageNum });
-  return extractCoursesFromDom(page);
+  return extractCoursesFromDom(page, logger);
 }
 
 /**
