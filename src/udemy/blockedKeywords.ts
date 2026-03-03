@@ -1,3 +1,5 @@
+import { normalizeForMatch } from '../utils/textNormalize.js';
+
 export const DISALLOWED_TITLE_KEYWORDS = [
   'Exam Prep',
   'AWS',
@@ -9,7 +11,6 @@ export const DISALLOWED_TITLE_KEYWORDS = [
   'Microservices',
   'SAP',
   'Excel',
-  'Powerpoint',
   'PowerPoint',
   'PowerPoint',
   'NVIDIA',
@@ -201,22 +202,28 @@ export const DISALLOWED_TITLE_KEYWORDS = [
 
 ] as const;
 
+const NORMALIZED_DISALLOWED_TITLE_KEYWORDS = DISALLOWED_TITLE_KEYWORDS
+  .map((keyword) => ({ keyword, normalized: normalizeForMatch(keyword) }))
+  .filter((entry) => entry.normalized.length > 0);
+
 export interface BlockedKeywordResult {
   readonly blocked: boolean;
   readonly matched?: string;
+  readonly matchedNormalized?: string;
 }
 
 export function isBlockedByKeyword(title: string): BlockedKeywordResult {
-  const normalizedTitle = title.trim().toLocaleLowerCase();
+  const normalizedTitle = normalizeForMatch(title);
   if (normalizedTitle.length === 0) {
     return { blocked: false };
   }
 
-  for (const keyword of DISALLOWED_TITLE_KEYWORDS) {
-    if (normalizedTitle.includes(keyword.toLocaleLowerCase())) {
+  for (const keyword of NORMALIZED_DISALLOWED_TITLE_KEYWORDS) {
+    if (normalizedTitle.includes(keyword.normalized)) {
       return {
         blocked: true,
-        matched: keyword
+        matched: keyword.keyword,
+        matchedNormalized: keyword.normalized
       };
     }
   }

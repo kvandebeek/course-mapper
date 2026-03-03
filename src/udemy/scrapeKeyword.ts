@@ -28,6 +28,7 @@ import {
 } from './navigation.js';
 import { sleepLogged, throttled } from '../utils/throttle.js';
 import { isBlockedByKeyword } from './blockedKeywords.js';
+import { normalizeForMatch } from '../utils/textNormalize.js';
 
 const RESULT_WAIT_TIMEOUT_MS = 15_000;
 const LOAD_MORE_WAIT_TIMEOUT_MS = 3_000;
@@ -273,7 +274,9 @@ export async function collectAndRankTopCourses(
           keyword,
           courseUrl,
           reason: REJECTION_REASON.BLOCKED_KEYWORD,
-          matchedKeyword: blockedByKeyword.matched
+          courseTitle: detail.title,
+          matchedKeyword: blockedByKeyword.matched,
+          matchedKeywordNormalized: blockedByKeyword.matchedNormalized
         });
         await opts.onCourseOutcome?.({
           keyword,
@@ -719,7 +722,7 @@ async function dumpEmptySearchHtml(
   hrefDebug?: HrefDebugDump
 ): Promise<void> {
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const safeKeyword = keyword.replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
+  const safeKeyword = normalizeForMatch(keyword).replace(/[^a-z0-9-_]+/g, '_');
   const dir = path.join('artifacts', 'nav_failures');
   await fs.mkdir(dir, { recursive: true });
   const outPath = path.join(dir, `search_${safeKeyword}_${ts}.html`);

@@ -9,6 +9,7 @@ import { appendFile, mkdir, readFile, stat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { escapeCsvField } from '../io/incrementalCsvWriter.js';
 import { nowIsoUtcMs } from '../utils/date.js';
+import { normalizeForMatch } from '../utils/textNormalize.js';
 
 export const ALL_COURSES_HEADERS = [
   'timeAdded',
@@ -116,7 +117,7 @@ export async function initAllCoursesWriter(
   async function appendInspectedCourse(row: AllCoursesAppendInput): Promise<boolean> {
     return queueWrite(async () => {
       if (seenInRun) {
-        const dedupeKey = `${row.keyword}|${row.courseUrl}|${row.status}`;
+        const dedupeKey = `${normalizeForMatch(row.keyword)}|${row.courseUrl}|${row.status}`;
         if (seenInRun.has(dedupeKey)) {
           return false;
         }

@@ -23,6 +23,7 @@ import {
 } from './udemy/searchTransport.js';
 import { UnknownRecord, isRecord, tryExtractHits } from './udemy/types.js';
 import { isBlockedByKeyword } from './udemy/blockedKeywords.js';
+import { normalizeForMatch } from './utils/textNormalize.js';
 
 interface SearchParams {
   readonly maxCoursesPerKeyword: number;
@@ -89,7 +90,9 @@ export async function extractCoursesFromDom(page: Page, logger?: Logger): Promis
       logger?.info('Course rejected', {
         courseUrl: normalizedUrl,
         reason: 'blocked_keyword',
-        matchedKeyword: blockedByKeyword.matched
+        courseTitle: title,
+        matchedKeyword: blockedByKeyword.matched,
+        matchedKeywordNormalized: blockedByKeyword.matchedNormalized
       });
       continue;
     }
@@ -241,7 +244,9 @@ async function extractViaApiOrDom(
             logger.info('Course rejected', {
               courseUrl: item.url,
               reason: 'blocked_keyword',
-              matchedKeyword: blockedByKeyword.matched
+              courseTitle: item.title,
+              matchedKeyword: blockedByKeyword.matched,
+              matchedKeywordNormalized: blockedByKeyword.matchedNormalized
             });
             return false;
           });
@@ -387,7 +392,7 @@ function mapHitToSearchPayload(course: UnknownRecord): SearchResultPayload | nul
  * sanitizeKeyword: internal utility for this module.
  */
 function sanitizeKeyword(keyword: string): string {
-  return keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'keyword';
+  return normalizeForMatch(keyword).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'keyword';
 }
 
 /**

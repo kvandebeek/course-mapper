@@ -13,6 +13,7 @@ import * as path from 'node:path';
 import { parse as parseCsv } from 'csv-parse/sync';
 import { stringify as stringifyCsv } from 'csv-stringify/sync';
 import { FrameworkLevelCode, parseLevelCode } from '../levels/frameworkLevelMapping.js';
+import { normalizeForMatch } from '../utils/textNormalize.js';
 
 export type ModuleType = 'core' | 'ai' | 'softskills';
 
@@ -194,13 +195,14 @@ export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): reado
       const values = splitAndCleanKeywordCell(row[moduleConfig.field]);
       for (const keyword of values) {
         if (parsedLevelCode) {
-          const codes = keywordToLevelCodes.get(keyword) ?? [];
+          const keywordKey = normalizeForMatch(keyword);
+          const codes = keywordToLevelCodes.get(keywordKey) ?? [];
           if (!codes.includes(parsedLevelCode)) {
-            keywordToLevelCodes.set(keyword, [...codes, parsedLevelCode]);
+            keywordToLevelCodes.set(keywordKey, [...codes, parsedLevelCode]);
           }
         }
 
-        const key = `${currentTrack}${level}${moduleConfig.moduleType}${keyword}`;
+        const key = `${currentTrack}${level}${moduleConfig.moduleType}${normalizeForMatch(keyword)}`;
         if (seen.has(key)) {
           continue;
         }
@@ -218,7 +220,7 @@ export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): reado
   return normalized
     .map((row): NormalizedKeywordRow => ({
       ...row,
-      levelCodes: keywordToLevelCodes.get(row.keyword) ?? []
+      levelCodes: keywordToLevelCodes.get(normalizeForMatch(row.keyword)) ?? []
     }))
     .sort(compareNormalizedRows);
 }
