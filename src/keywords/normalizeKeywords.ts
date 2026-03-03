@@ -1,8 +1,11 @@
 /**
- * src/keywords/normalizeKeywords.ts
+ * Source keyword CSV normalization.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * Responsibilities:
+ * - Parse `keywords-list.csv` shape used by the career framework.
+ * - Split multi-value keyword cells into one row per keyword/module type.
+ * - Normalize level labels into canonical level codes and deterministic ordering.
+ * - Persist `artifacts/keywords.normalized.csv` used by the scraper runtime.
  */
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';

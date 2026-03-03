@@ -1,8 +1,10 @@
 /**
- * src/filter.ts
+ * Lightweight eligibility filter used by legacy/non-Playwright scoring paths.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * The filter is deterministic and only checks:
+ * - language is in configured English locale set,
+ * - rating meets minimum,
+ * - rating-count meets minimum.
  */
 
 import { AppConfig, CourseRaw } from './types.js';
