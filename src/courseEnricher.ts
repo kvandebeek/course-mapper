@@ -68,7 +68,7 @@ async function fetchCourseDetails(
   keyword: string,
   item: SearchResultPayload
 ): Promise<CourseRaw> {
-  const endpoint = `https://resillion.udemy.com/api-2.0/courses/${item.id}/?fields[course]=title,url,headline,locale,avg_rating,num_reviews,instructional_level,content_info,estimated_content_length,primary_category,primary_subcategory,badge_family`; 
+  const endpoint = `https://resillion.udemy.com/api-2.0/courses/${item.id}/?fields[course]=title,url,headline,locale,avg_rating,num_reviews,content_info,estimated_content_length,primary_category,primary_subcategory,badge_family`; 
   const response = await context.request.get(endpoint, {
     headers: {
       referer: item.url
@@ -100,7 +100,6 @@ async function fetchCourseDetails(
     title: toString(payload.title) || item.title,
     language: toString(localeObj?.locale) || item.locale,
     durationMinutes,
-    udemyLevel: toString(payload.instructional_level) || item.level,
     category,
     rating: toNumber(payload.avg_rating) ?? item.rating,
     ratingCount: toNumber(payload.num_reviews) ?? item.ratingCount,
@@ -119,7 +118,6 @@ function mapFallback(keyword: string, item: SearchResultPayload): CourseRaw {
     title: item.title,
     language: item.locale,
     durationMinutes: null,
-    udemyLevel: item.level,
     category: null,
     rating: item.rating,
     ratingCount: item.ratingCount,

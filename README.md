@@ -103,6 +103,8 @@ track,level,levelCodes,moduleType,keyword
 - `moduleType`
 - `keyword`
 - `courseInstructionalLevel`
+
+Instructional-level filtering is driven only by keyword level mapping + search URL `instructional_level` query parameters. Detail pages are not parsed for level and never used for eligibility decisions. Exported `courseInstructionalLevel` is always `all` to keep CSV schema/type compatibility.
 - `courseTitle`
 - `courseUrl`
 - `rating`

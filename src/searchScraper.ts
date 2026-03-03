@@ -87,8 +87,7 @@ export async function extractCoursesFromDom(page: Page): Promise<readonly Search
       url: normalizedUrl,
       locale: '',
       rating: null,
-      ratingCount: null,
-      level: null
+      ratingCount: null
     });
   }
 
@@ -352,7 +351,6 @@ function mapHitToSearchPayload(course: UnknownRecord): SearchResultPayload | nul
     locale: locale || toString(course.locale_simple),
     rating: toNumber(course.rating),
     ratingCount: toNumber(course.num_reviews),
-    level: toString(course.instructional_level_simple) || null
   };
 }
 

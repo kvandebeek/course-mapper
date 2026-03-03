@@ -18,13 +18,21 @@ import {
   writeNavigationFailureArtifacts
 } from './navigation.js';
 import { sleepLogged, throttled } from '../utils/throttle.js';
-import { mapUdemyInstructionalLevel } from './instructionalLevel.js';
 
 const RESULT_WAIT_TIMEOUT_MS = 25_000;
 const LOAD_MORE_WAIT_TIMEOUT_MS = 10_000;
 const DEBUG_HREF_LIMIT = 30;
 
 export type CourseUrl = string;
+
+export const REJECTION_REASON = {
+  RATING_BELOW_MIN: 'rating_below_min',
+  RATING_COUNT_BELOW_MIN: 'rating_count_below_min',
+} as const;
+
+const LOG_EVENT = {
+  COURSE_REJECTED: 'Course rejected'
+} as const;
 
 export const DEFAULT_FILTERS: SearchFilters = {
   minRating: 4.6,
@@ -34,6 +42,15 @@ export const DEFAULT_FILTERS: SearchFilters = {
 };
 
 export type AllowedInstructionalLevel = Exclude<InstructionalLevel, 'all'>;
+
+export type CourseEligibilityContext = Readonly<{
+  requestedInstructionalLevels: readonly InstructionalLevel[];
+}>;
+
+export type DiscoveredCourseCandidate = Readonly<{
+  courseUrl: CourseUrl;
+  eligibilityContext: CourseEligibilityContext;
+}>;
 
 /**
  * collectCourseUrlsForKeyword: public helper used by other modules.
@@ -49,14 +66,16 @@ export async function collectCourseUrlsForKeyword(
     readonly throttleMs: number;
   },
   logger: Logger
-): Promise<readonly string[]> {
+): Promise<readonly DiscoveredCourseCandidate[]> {
   const mergedFilters: SearchFilters = opts.allowedInstructionalLevels && opts.allowedInstructionalLevels.length > 0
     ? { ...opts.filters, instructionalLevels: opts.allowedInstructionalLevels }
     : opts.filters;
   const baseSearchUrl = buildSearchUrl(keyword, mergedFilters);
   logger.info('Keyword URL collection started', { keyword, baseSearchUrl });
 
-  const unique = new Set<CourseUrl>();
+  const unique = new Map<CourseUrl, DiscoveredCourseCandidate>();
+  const requestedInstructionalLevels = [...(mergedFilters.instructionalLevels ?? [])] satisfies InstructionalLevel[];
+  logger.info('Applying instructional_level search filters', { keyword, requestedInstructionalLevels });
 
   try {
     await gotoWithRetries(page, baseSearchUrl, { operationName: 'openSearchPage', throttleMs: opts.throttleMs, logger });
@@ -69,7 +88,15 @@ export async function collectCourseUrlsForKeyword(
   }
 
   for (let pageIndex = 1; pageIndex <= opts.maxPages; pageIndex += 1) {
-    const iteration = await collectSearchIteration(page, keyword, unique, opts.maxCourses, logger, pageIndex);
+    const iteration = await collectSearchIteration(
+      page,
+      keyword,
+      unique,
+      opts.maxCourses,
+      logger,
+      pageIndex,
+      { requestedInstructionalLevels }
+    );
     if (iteration.extractedCount === 0) {
       await dumpEmptySearchHtml(keyword, page, await page.content(), logger, iteration.debug);
     }
@@ -101,7 +128,7 @@ export async function collectCourseUrlsForKeyword(
     }
   }
 
-  return [...unique].slice(0, opts.maxCourses);
+  return [...unique.values()].slice(0, opts.maxCourses);
 }
 
 /**
@@ -119,9 +146,9 @@ export async function collectAndRankTopCourses(
   },
   logger: Logger
 ): Promise<readonly CourseDetail[]> {
-  const urls = await collectCourseUrlsForKeyword(page, keyword, opts, logger);
+  const discoveredCourses = await collectCourseUrlsForKeyword(page, keyword, opts, logger);
 
-  if (urls.length === 0) {
+  if (discoveredCourses.length === 0) {
     logger.info('Keyword completed with no course URLs found', { keyword, reason: 'no course URLs found' });
     return [];
   }
@@ -129,7 +156,8 @@ export async function collectAndRankTopCourses(
   const details: CourseDetail[] = [];
   const rejectionCounts = new Map<string, number>();
 
-  for (const courseUrl of urls) {
+  for (const discoveredCourse of discoveredCourses) {
+    const { courseUrl } = discoveredCourse;
     try {
       logger.debug('Detail extraction entrypoint', {
         keyword,
@@ -163,9 +191,7 @@ export async function collectAndRankTopCourses(
       });
       const eligibility = computeEligibility({
         rating: detail.rating,
-        ratingCount: detail.ratingCount,
-        udemyLevel: detail.udemyLevel,
-        ...(opts.allowedInstructionalLevels ? { allowedInstructionalLevels: opts.allowedInstructionalLevels } : {})
+        ratingCount: detail.ratingCount
       });
 
       logger.info('Computed filters', {
@@ -192,7 +218,7 @@ export async function collectAndRankTopCourses(
         logger.info('Course accepted', { keyword, courseUrl, courseId: detail.courseId, title: detail.title });
         details.push(detail);
       } else {
-        logger.info('Course rejected', { keyword, courseUrl, reason: eligibility.reason });
+        logger.info(LOG_EVENT.COURSE_REJECTED, { keyword, courseUrl, reason: eligibility.reason });
         if (eligibility.reason !== null) {
           rejectionCounts.set(eligibility.reason, (rejectionCounts.get(eligibility.reason) ?? 0) + 1);
         }
@@ -216,7 +242,7 @@ export async function collectAndRankTopCourses(
   return rankCourses(details).slice(0, 3);
 }
 
-export type FailureReason = 'rating_below_min' | 'rating_count_below_min' | 'missing_or_unknown_instructional_level' | 'instructional_level_not_allowed';
+export type FailureReason = (typeof REJECTION_REASON)[keyof typeof REJECTION_REASON];
 
 export type Eligibility = Readonly<{
   eligible: boolean;
@@ -230,8 +256,6 @@ export function computeEligibility(
   input: Readonly<{
     rating: number | null;
     ratingCount: number | null;
-    udemyLevel?: string | null;
-    allowedInstructionalLevels?: readonly AllowedInstructionalLevel[];
   }>
 ): Eligibility {
   const minRating = 4.5;
@@ -241,21 +265,11 @@ export function computeEligibility(
   const ratingCount = input.ratingCount ?? 0;
 
   if (rating < minRating) {
-    return { eligible: false, reason: 'rating_below_min' };
+    return { eligible: false, reason: REJECTION_REASON.RATING_BELOW_MIN };
   }
 
   if (ratingCount < minRatingCount) {
-    return { eligible: false, reason: 'rating_count_below_min' };
-  }
-
-  if (input.allowedInstructionalLevels && input.allowedInstructionalLevels.length > 0) {
-    const normalizedUdemyLevel = input.udemyLevel ? mapUdemyInstructionalLevel(input.udemyLevel) : null;
-    if (!normalizedUdemyLevel) {
-      return { eligible: false, reason: 'missing_or_unknown_instructional_level' };
-    }
-    if (!input.allowedInstructionalLevels.includes(normalizedUdemyLevel)) {
-      return { eligible: false, reason: 'instructional_level_not_allowed' };
-    }
+    return { eligible: false, reason: REJECTION_REASON.RATING_COUNT_BELOW_MIN };
   }
 
   return { eligible: true, reason: null };
@@ -357,10 +371,11 @@ export function canonicalizeUrl(rawHref: string, baseUrl: string): string | null
 async function collectSearchIteration(
   page: Page,
   keyword: string,
-  unique: Set<CourseUrl>,
+  unique: Map<CourseUrl, DiscoveredCourseCandidate>,
   maxCourses: number,
   logger: Logger,
-  pageIndex: number
+  pageIndex: number,
+  eligibilityContext: CourseEligibilityContext
 ): Promise<{ readonly extractedCount: number; readonly addedCount: number; readonly courseLikeAnchorCount: number; readonly debug: HrefDebugDump }> {
   const rawHrefs = await extractRenderedHrefs(page);
   const courseLikeHrefs = rawHrefs.filter((href) => href.includes('/course/'));
@@ -379,7 +394,12 @@ async function collectSearchIteration(
     if (unique.size >= maxCourses) {
       break;
     }
-    unique.add(courseUrl);
+    if (!unique.has(courseUrl)) {
+      unique.set(courseUrl, {
+        courseUrl,
+        eligibilityContext
+      });
+    }
   }
   const addedCount = unique.size - before;
 

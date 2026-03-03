@@ -51,17 +51,16 @@ test('computeEligibility only uses rating and ratingCount thresholds', () => {
   });
 });
 
-test('computeEligibility rejects missing or disallowed instructional levels when constrained', () => {
+
+test('computeEligibility does not depend on instructional level context', () => {
   assert.deepEqual(
     computeEligibility({
       rating: 4.8,
       ratingCount: 5000,
-      allowedInstructionalLevels: ['beginner'],
-      udemyLevel: null
     }),
     {
-      eligible: false,
-      reason: 'missing_or_unknown_instructional_level'
+      eligible: true,
+      reason: null
     }
   );
 
@@ -69,21 +68,6 @@ test('computeEligibility rejects missing or disallowed instructional levels when
     computeEligibility({
       rating: 4.8,
       ratingCount: 5000,
-      allowedInstructionalLevels: ['beginner'],
-      udemyLevel: 'Expert'
-    }),
-    {
-      eligible: false,
-      reason: 'instructional_level_not_allowed'
-    }
-  );
-
-  assert.deepEqual(
-    computeEligibility({
-      rating: 4.8,
-      ratingCount: 5000,
-      allowedInstructionalLevels: ['beginner', 'intermediate'],
-      udemyLevel: 'Intermediate Level'
     }),
     {
       eligible: true,
@@ -91,7 +75,6 @@ test('computeEligibility rejects missing or disallowed instructional levels when
     }
   );
 });
-
 
 
 test('buildSearchUrl rounds minRating down to one decimal for ratings param', () => {
