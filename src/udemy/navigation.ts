@@ -13,11 +13,13 @@ import { throttled } from '../utils/throttle.js';
 
 export type InstructionalLevel = 'all' | 'beginner' | 'intermediate' | 'expert';
 export type SortOrder = 'relevance' | 'highest-rated' | 'most-reviewed' | 'newest';
+export type DurationBucket = 'extraShort' | 'short' | 'medium' | 'long' | 'extraLong';
 
 export interface SearchFilters {
   readonly minRating?: number;
   readonly lang?: string;
   readonly instructionalLevels?: readonly InstructionalLevel[];
+  readonly durations?: readonly DurationBucket[];
   readonly sort?: SortOrder;
 }
 
@@ -43,6 +45,12 @@ export function buildSearchUrl(keyword: string, filters: SearchFilters): string 
   if (filters.instructionalLevels && filters.instructionalLevels.length > 0) {
     for (const level of filters.instructionalLevels) {
       url.searchParams.append('instructional_level', level);
+    }
+  }
+
+  if (filters.durations && filters.durations.length > 0) {
+    for (const bucket of filters.durations) {
+      url.searchParams.append('duration', bucket);
     }
   }
 

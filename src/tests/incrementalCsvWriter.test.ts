@@ -24,7 +24,9 @@ test('incremental writer writes top courses header and appends rows across write
     'courseTitle',
     'courseUrl',
     'rating',
-    'ratingCount'
+    'ratingCount',
+    'duration',
+    'durationTotalMinutes'
   ] as const;
 
   const writer = createIncrementalCsvWriter({ outputFilePath, headers });
@@ -38,7 +40,9 @@ test('incremental writer writes top courses header and appends rows across write
     courseTitle: 'Course One',
     courseUrl: 'https://example.com/1',
     rating: 4.8,
-    ratingCount: 5000
+    ratingCount: 5000,
+    duration: '2h 25m',
+    durationTotalMinutes: 145
   });
   await writer.appendRow({
     track: 'Data',
@@ -49,7 +53,9 @@ test('incremental writer writes top courses header and appends rows across write
     courseTitle: 'Course, Two',
     courseUrl: 'https://example.com/2',
     rating: 4.7,
-    ratingCount: 2400
+    ratingCount: 2400,
+    duration: '1h 0m',
+    durationTotalMinutes: 60
   });
   await writer.appendRow({
     track: 'Data',
@@ -60,7 +66,9 @@ test('incremental writer writes top courses header and appends rows across write
     courseTitle: 'Course "Three"',
     courseUrl: 'https://example.com/3',
     rating: 4.6,
-    ratingCount: 1501
+    ratingCount: 1501,
+    duration: '',
+    durationTotalMinutes: ''
   });
 
   const writerSecondRun = createIncrementalCsvWriter({ outputFilePath, headers });
@@ -73,7 +81,9 @@ test('incremental writer writes top courses header and appends rows across write
     courseTitle: 'Course Four',
     courseUrl: 'https://example.com/4',
     rating: 4.9,
-    ratingCount: 9000
+    ratingCount: 9000,
+    duration: '14h 26m',
+    durationTotalMinutes: 866
   });
 
   const content = await readFile(outputFilePath, 'utf-8');
@@ -81,11 +91,11 @@ test('incremental writer writes top courses header and appends rows across write
 
   assert.equal(
     lines[0],
-    'track,level,moduleType,keyword,courseInstructionalLevel,courseTitle,courseUrl,rating,ratingCount'
+    'track,level,moduleType,keyword,courseInstructionalLevel,courseTitle,courseUrl,rating,ratingCount,duration,durationTotalMinutes'
   );
   assert.equal(lines.length, 5);
-  assert.equal(lines[1], ',L1,core,alpha,beginner,Course One,https://example.com/1,4.8,5000');
-  assert.equal(lines[2], 'Data,L2,ai,beta,intermediate,"Course, Two",https://example.com/2,4.7,2400');
-  assert.equal(lines[3], 'Data,L3,softskills,gamma,expert,"Course ""Three""",https://example.com/3,4.6,1501');
-  assert.equal(lines[4], 'Data,L4,core,delta,all,Course Four,https://example.com/4,4.9,9000');
+  assert.equal(lines[1], ',L1,core,alpha,beginner,Course One,https://example.com/1,4.8,5000,2h 25m,145');
+  assert.equal(lines[2], 'Data,L2,ai,beta,intermediate,"Course, Two",https://example.com/2,4.7,2400,1h 0m,60');
+  assert.equal(lines[3], 'Data,L3,softskills,gamma,expert,"Course ""Three""",https://example.com/3,4.6,1501,,');
+  assert.equal(lines[4], 'Data,L4,core,delta,all,Course Four,https://example.com/4,4.9,9000,14h 26m,866');
 });

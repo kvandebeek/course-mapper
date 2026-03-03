@@ -15,7 +15,9 @@ const CSV_HEADERS: readonly string[] = [
   'courseTitle',
   'courseUrl',
   'rating',
-  'ratingCount'
+  'ratingCount',
+  'duration',
+  'durationTotalMinutes'
 ];
 
 /**
@@ -29,7 +31,9 @@ export async function writeOutputCsv(outputPath: string, rows: readonly ExportRo
     row.courseTitle,
     row.courseUrl,
     row.rating,
-    row.ratingCount
+    row.ratingCount,
+    row.duration,
+    row.durationTotalMinutes
   ]);
 
   const csv = stringify([CSV_HEADERS, ...data]);

@@ -15,6 +15,10 @@ export interface CourseDetail {
   readonly rating: number | null;
   readonly ratingCount: number | null;
   readonly udemyLevel: string | null;
+  readonly durationHours: number | null;
+  readonly durationMinutes: number | null;
+  readonly durationTotalMinutes: number | null;
+  readonly durationDisplay: string | null;
 }
 
 interface RuntimeExtraction {
@@ -80,6 +84,19 @@ async function extractDetailFromScripts(page: Page, keyword: string, courseUrl: 
 
   const ldCourse = parseLdCourse(ldJsonTexts);
   const runtimeCourse = parseUdRuntimePayload(html);
+  const totalLengthLocator = page.getByText(/total length/i);
+  const totalLengthCount = await totalLengthLocator.count().catch(() => 0);
+  if (totalLengthCount > 1) {
+    console.debug('[debug] Multiple total length matches found; using first', { courseUrl, totalLengthCount });
+  }
+  const totalLengthText = totalLengthCount > 0
+    ? await totalLengthLocator.first().textContent().catch(() => null)
+    : null;
+  const parsedLength = parseUdemyTotalLength(totalLengthText ?? '');
+
+  if (!parsedLength && totalLengthText) {
+    console.debug('[debug] Unable to parse course duration', { courseUrl, rawText: totalLengthText.slice(0, 160) });
+  }
 
   const title = firstNonEmpty(runtimeCourse?.title, ldCourse?.name, pageTitle, 'Untitled Course');
   const result: CourseDetail = {
@@ -89,7 +106,11 @@ async function extractDetailFromScripts(page: Page, keyword: string, courseUrl: 
     url: firstNonEmpty(canonical ?? undefined, ldCourse?.url, courseUrl),
     rating: runtimeCourse?.rating ?? ldCourse?.ratingValue ?? null,
     ratingCount: runtimeCourse?.ratingCount ?? ldCourse?.ratingCount ?? null,
-    udemyLevel: runtimeCourse?.instructionalLevel ?? null
+    udemyLevel: runtimeCourse?.instructionalLevel ?? null,
+    durationHours: parsedLength?.hours ?? null,
+    durationMinutes: parsedLength?.minutes ?? null,
+    durationTotalMinutes: parsedLength?.totalMinutes ?? null,
+    durationDisplay: parsedLength?.display ?? null
   };
 
   if (!runtimeCourse && !ldCourse) {
@@ -97,6 +118,78 @@ async function extractDetailFromScripts(page: Page, keyword: string, courseUrl: 
   }
 
   return result;
+}
+
+
+
+export type ParsedUdemyTotalLength = Readonly<{
+  hours: number;
+  minutes: number;
+  totalMinutes: number;
+  display: string;
+}>;
+
+/**
+ * parseUdemyTotalLength: public helper used by other modules.
+ */
+export function parseUdemyTotalLength(text: string): ParsedUdemyTotalLength | null {
+  const normalizedText = text.trim();
+  if (normalizedText.length === 0) {
+    return null;
+  }
+
+  const [prefix] = normalizedText.split(/total length/i, 1);
+  const source = (prefix ?? normalizedText).trim();
+  if (source.length === 0) {
+    return null;
+  }
+
+  const hoursMinutes = source.match(/(\d+)\s*h\s*(\d+)\s*m/i);
+  if (hoursMinutes) {
+    const hours = Number(hoursMinutes[1]);
+    const minutes = Number(hoursMinutes[2]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return null;
+    }
+    return {
+      hours,
+      minutes,
+      totalMinutes: (hours * 60) + minutes,
+      display: `${hours}h ${minutes}m`
+    };
+  }
+
+  const minutesOnly = source.match(/(\d+)\s*m/i);
+  if (minutesOnly) {
+    const minutes = Number(minutesOnly[1]);
+    if (!Number.isFinite(minutes)) {
+      return null;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return {
+      hours,
+      minutes: remainder,
+      totalMinutes: minutes,
+      display: `${hours}h ${remainder}m`
+    };
+  }
+
+  const hoursOnly = source.match(/(\d+)\s*h/i);
+  if (hoursOnly) {
+    const hours = Number(hoursOnly[1]);
+    if (!Number.isFinite(hours)) {
+      return null;
+    }
+    return {
+      hours,
+      minutes: 0,
+      totalMinutes: hours * 60,
+      display: `${hours}h 0m`
+    };
+  }
+
+  return null;
 }
 
 interface ParsedLdCourse {

@@ -29,6 +29,7 @@ export type CourseUrl = string;
 export const DEFAULT_FILTERS: SearchFilters = {
   minRating: 4.6,
   lang: 'en',
+  durations: ['extraShort', 'short', 'medium', 'long'],
   sort: 'relevance'
 };
 

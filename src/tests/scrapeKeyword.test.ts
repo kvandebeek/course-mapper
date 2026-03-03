@@ -103,3 +103,19 @@ test('buildSearchUrl appends multiple instructional_level params', () => {
   const parsed = new URL(url);
   assert.deepEqual(parsed.searchParams.getAll('instructional_level'), ['beginner', 'intermediate']);
 });
+
+
+test('buildSearchUrl appends repeated duration params while preserving existing params', () => {
+  const url = buildSearchUrl('python', {
+    minRating: 4.6,
+    lang: 'en',
+    instructionalLevels: ['beginner', 'intermediate'],
+    durations: ['extraShort', 'medium', 'long'],
+    sort: 'relevance'
+  });
+
+  const parsed = new URL(url);
+  assert.deepEqual(parsed.searchParams.getAll('duration'), ['extraShort', 'medium', 'long']);
+  assert.deepEqual(parsed.searchParams.getAll('instructional_level'), ['beginner', 'intermediate']);
+  assert.equal(parsed.searchParams.get('sort'), 'relevance');
+});
