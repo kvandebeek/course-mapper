@@ -23,7 +23,9 @@ export interface NormalizedKeywordRow {
 
 interface SourceKeywordCsvRow {
   readonly Track?: string;
+  readonly track?: string;
   readonly Level?: string;
+  readonly level?: string;
   readonly 'Core Modules'?: string;
   readonly 'AI Modules'?: string;
   readonly Softskills?: string;
@@ -51,7 +53,7 @@ function hasExpectedHeaders(rows: readonly SourceKeywordCsvRow[]): boolean {
   if (sample === undefined) {
     return false;
   }
-  return Object.hasOwn(sample, 'Track') && Object.hasOwn(sample, 'Level');
+  return (Object.hasOwn(sample, 'Track') || Object.hasOwn(sample, 'track')) && (Object.hasOwn(sample, 'Level') || Object.hasOwn(sample, 'level'));
 }
 
 /**
@@ -118,6 +120,38 @@ function compareNormalizedRows(a: NormalizedKeywordRow, b: NormalizedKeywordRow)
 }
 
 /**
+ * readRequiredTrack: internal utility for this module.
+ */
+function readRequiredTrack(row: SourceKeywordCsvRow, rowIndex: number, currentTrack: string): string {
+  const trackCandidates = [row.Track, row.track]
+    .map((value) => (value ?? '').trim())
+    .filter((value) => value.length > 0);
+
+  if (trackCandidates.length > 0) {
+    return trackCandidates[0] ?? currentTrack;
+  }
+
+  if (currentTrack.trim().length > 0) {
+    return currentTrack;
+  }
+
+  const availableKeys = Object.keys(row).sort();
+  throw new Error(
+    `Missing required track value at source keyword row ${rowIndex + 2}. Available keys: ${availableKeys.join(', ') || '(none)'}`
+  );
+}
+
+/**
+ * readLevelValue: internal utility for this module.
+ */
+function readLevelValue(row: SourceKeywordCsvRow): string {
+  const levelCandidates = [row.Level, row.level]
+    .map((value) => (value ?? '').trim())
+    .filter((value) => value.length > 0);
+  return levelCandidates[0] ?? '';
+}
+
+/**
  * normalizeSourceRows: public helper used by other modules.
  */
 export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): readonly NormalizedKeywordRow[] {
@@ -126,13 +160,9 @@ export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): reado
   const keywordToLevelCodes = new Map<string, FrameworkLevelCode[]>();
   let currentTrack = '';
 
-  for (const row of rows) {
-    const track = (row.Track ?? '').trim();
-    if (track.length > 0) {
-      currentTrack = track;
-    }
-
-    const level = (row.Level ?? '').trim();
+  for (const [rowIndex, row] of rows.entries()) {
+    currentTrack = readRequiredTrack(row, rowIndex, currentTrack);
+    const level = readLevelValue(row);
     const parsedLevelCode = parseLevelCode(level);
 
     for (const moduleConfig of MODULE_FIELDS) {
