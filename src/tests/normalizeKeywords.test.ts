@@ -7,7 +7,10 @@
 
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { normalizeKeywordsFromString, splitAndCleanKeywordCell } from '../keywords/normalizeKeywords.js';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { normalizeKeywordsFile, normalizeKeywordsFromString, splitAndCleanKeywordCell } from '../keywords/normalizeKeywords.js';
 
 test('splitAndCleanKeywordCell splits comma-separated values and normalizes spacing', () => {
   assert.deepEqual(splitAndCleanKeywordCell(' Introduction to Testing, Test\u00A0Case   Design, , Exploratory   Testing '), [
@@ -70,6 +73,29 @@ test('keyword appearing at multiple levels stores union of level codes in stable
 });
 
 
+
+
+test('normalizes BOM-prefixed headers so Track is readable', () => {
+  const csv = [
+    '\uFEFFTrack,Level,Core Modules,AI Modules,Softskills',
+    'Pathfinding,A1 Intern,"Core 1","AI 1","Soft 1"'
+  ].join('\r\n');
+
+  const rows = normalizeKeywordsFromString(csv);
+  assert.equal(rows[0]?.track, 'Pathfinding');
+  assert.ok(rows.every((row) => row.track === 'Pathfinding'));
+});
+
+test('normalizes whitespace-padded headers to canonical names', () => {
+  const csv = [
+    ' Track , Level , Core Modules , AI Modules , Softskills ',
+    'Pathfinding,A1 Intern,"Core 1","AI 1","Soft 1"'
+  ].join('\n');
+
+  const rows = normalizeKeywordsFromString(csv);
+  assert.equal(rows[0]?.track, 'Pathfinding');
+  assert.ok(rows.every((row) => row.level === 'A1 Intern'));
+});
 test('normalization preserves Track for sample row used in scraper input', () => {
   const csv = [
     'Track,Level,Core Modules,AI Modules,Softskills',
@@ -84,15 +110,7 @@ test('normalization preserves Track for sample row used in scraper input', () =>
   assert.equal(target.level, 'A1 Intern');
 });
 
-test('supports lowercase track header and throws when first row track is missing', () => {
-  const lowercaseHeaderCsv = [
-    'track,Level,Core Modules,AI Modules,Softskills',
-    'Pathfinding,A1 Intern,"Core 1","AI 1","Soft 1"'
-  ].join('\n');
-
-  const lowercaseRows = normalizeKeywordsFromString(lowercaseHeaderCsv);
-  assert.equal(lowercaseRows[0]?.track, 'Pathfinding');
-
+test('throws when first row track is missing', () => {
   const missingTrackCsv = [
     'Track,Level,Core Modules,AI Modules,Softskills',
     ',A1 Intern,"Core 1","AI 1","Soft 1"'
@@ -102,4 +120,27 @@ test('supports lowercase track header and throws when first row track is missing
     () => normalizeKeywordsFromString(missingTrackCsv),
     /Missing required track value at source keyword row 2\. Available keys:/
   );
+});
+
+
+test('normalizeKeywordsFile writes non-empty track values to normalized output', async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'normalize-keywords-'));
+  const sourceFile = path.join(tempDir, 'keywords-list.csv');
+  const outputFile = path.join(tempDir, 'keywords.normalized.csv');
+
+  const csv = [
+    '\uFEFFTrack,Level,Core Modules,AI Modules,Softskills',
+    'Pathfinding,A1 Intern,"Core 1","AI 1","Soft 1"'
+  ].join('\n');
+
+  await writeFile(sourceFile, csv, 'utf-8');
+  await normalizeKeywordsFile({ sourceFile, outputFile });
+
+  const output = await readFile(outputFile, 'utf-8');
+  const lines = output.trim().split(/\r?\n/);
+  assert.equal(lines[0], 'track,level,levelCodes,moduleType,keyword');
+
+  const trackValues = lines.slice(1).map((line) => line.split(',')[0]);
+  assert.ok(trackValues.length > 0);
+  assert.ok(trackValues.every((track) => track === 'Pathfinding'));
 });
