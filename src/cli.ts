@@ -17,7 +17,7 @@ import { ensureNormalizedKeywords } from './keywords/ensureNormalizedKeywords.js
 import { loadNormalizedKeywords } from './keywords/loadNormalizedKeywords.js';
 import { createIncrementalCsvWriter } from './io/incrementalCsvWriter.js';
 import { buildExportRow } from './results/buildExportRow.js';
-import { getAllowedInstructionalLevels } from './levels/frameworkLevelMapping.js';
+import { parseCareerLevel, LEVEL_TO_INSTRUCTIONAL } from './levels/careerLevel.js';
 
 /**
  * printHelp: internal utility for this module.
@@ -102,6 +102,23 @@ async function main(): Promise<void> {
       logger.info('Keyword processing started', { keyword: keywordRow.keyword });
 
       try {
+        const careerLevel = parseCareerLevel(keywordRow.level);
+        if (!careerLevel) {
+          logger.warn('Keyword skipped: unable to parse career level', {
+            keyword: keywordRow.keyword,
+            level: keywordRow.level
+          });
+          continue;
+        }
+
+        const allowedInstructionalLevels = LEVEL_TO_INSTRUCTIONAL[careerLevel];
+        logger.debug('Career level mapping resolved', {
+          keyword: keywordRow.keyword,
+          level: keywordRow.level,
+          careerLevel,
+          allowedInstructionalLevels
+        });
+
         session = await sessionManager.getOrCreateSession();
         const runtimePage = await session.ensurePage();
         enforceSameTabNavigation(session.context, runtimePage);
@@ -109,9 +126,10 @@ async function main(): Promise<void> {
         const topCourses = await collectAndRankTopCourses(
           runtimePage,
           keywordRow.keyword,
+          careerLevel,
           {
             filters: { ...DEFAULT_FILTERS, durations },
-            allowedInstructionalLevels: getAllowedInstructionalLevels(keywordRow.levelCodes),
+            allowedInstructionalLevels,
             maxCourses: Math.min(cli.maxCoursesPerKeyword, 200),
             maxPages: cli.maxPages,
             throttleMs: cli.throttleMs

@@ -35,6 +35,33 @@ test('buildExportRow preserves track from keyword row', () => {
   assert.equal(row.courseInstructionalLevel, 'all');
 });
 
+test('buildExportRow uses course instructional level when provided', () => {
+  const keywordRow: KeywordRow = {
+    track: 'Pathfinding',
+    level: 'B1 Engineer',
+    levelCodes: ['B1'],
+    moduleType: 'core',
+    keyword: 'Automation Engineering'
+  };
+
+  const course = {
+    keyword: 'Automation Engineering',
+    courseId: 456,
+    title: 'Automation Foundations',
+    url: 'https://resillion.udemy.com/course/automation-foundations/',
+    rating: 4.6,
+    ratingCount: 2500,
+    durationHours: 5,
+    durationMinutes: 30,
+    durationTotalMinutes: 330,
+    durationDisplay: '5h 30m',
+    instructionalLevel: 'intermediate' as const
+  };
+
+  const row = buildExportRow(keywordRow, course);
+  assert.equal(row.courseInstructionalLevel, 'intermediate');
+});
+
 
 test('buildExportRow throws if track is blank', () => {
   const keywordRow: KeywordRow = {

@@ -1,10 +1,15 @@
 import { ExportRow, KeywordRow } from '../types.js';
 import { CourseDetail } from '../udemy/extractCourseDetail.js';
+import { CourseInstructionalLevel } from '../levels/careerLevel.js';
+
+type CourseWithInstructionalLevel = CourseDetail & Readonly<{
+  instructionalLevel?: CourseInstructionalLevel;
+}>;
 
 /**
  * buildExportRow: public helper used by other modules.
  */
-export function buildExportRow(keywordRow: KeywordRow, course: CourseDetail): ExportRow {
+export function buildExportRow(keywordRow: KeywordRow, course: CourseWithInstructionalLevel): ExportRow {
   const track = keywordRow.track.trim();
   if (track.length === 0) {
     throw new Error(`Cannot build export row for keyword "${keywordRow.keyword}": track is required`);
@@ -15,7 +20,7 @@ export function buildExportRow(keywordRow: KeywordRow, course: CourseDetail): Ex
     level: keywordRow.level,
     moduleType: keywordRow.moduleType,
     keyword: keywordRow.keyword,
-    courseInstructionalLevel: 'all',
+    courseInstructionalLevel: course.instructionalLevel ?? 'all',
     courseTitle: course.title,
     courseUrl: course.url,
     rating: course.rating ?? 0,
