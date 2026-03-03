@@ -52,16 +52,11 @@ test('computeEligibility only uses rating and ratingCount thresholds', () => {
 });
 
 
-test('computeEligibility ignores instructional level from detail page', () => {
+test('computeEligibility does not depend on instructional level context', () => {
   assert.deepEqual(
     computeEligibility({
       rating: 4.8,
       ratingCount: 5000,
-      allowedInstructionalLevels: ['beginner'],
-      udemyLevel: null,
-      eligibilityContext: {
-        requestedInstructionalLevels: ['beginner']
-      }
     }),
     {
       eligible: true,
@@ -73,11 +68,6 @@ test('computeEligibility ignores instructional level from detail page', () => {
     computeEligibility({
       rating: 4.8,
       ratingCount: 5000,
-      allowedInstructionalLevels: ['beginner'],
-      udemyLevel: 'Expert',
-      eligibilityContext: {
-        requestedInstructionalLevels: ['beginner']
-      }
     }),
     {
       eligible: true,
