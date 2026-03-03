@@ -101,6 +101,8 @@ track,level,levelCodes,moduleType,keyword
 - `moduleType`
 - `keyword`
 - `courseInstructionalLevel`
+
+When the detail page does not expose a parseable instructional level, the course is still accepted if search-level filters were applied in the query URL. In that case, exported `courseInstructionalLevel` is set to `all` to keep CSV schema/type compatibility.
 - `courseTitle`
 - `courseUrl`
 - `rating`
