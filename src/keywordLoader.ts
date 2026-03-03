@@ -31,6 +31,7 @@ export async function loadKeywords(path: string): Promise<KeywordRow[]> {
     .map((row): KeywordRow => ({
       track: toRequiredString(row.track),
       level: toRequiredString(row.level),
+      levelCodes: toRequiredString(row.levelCodes),
       moduleType: toRequiredString(row.moduleType),
       keyword: toRequiredString(row.keyword)
     }))

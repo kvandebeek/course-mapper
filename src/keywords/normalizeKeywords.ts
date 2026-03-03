@@ -9,12 +9,14 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { parse as parseCsv } from 'csv-parse/sync';
 import { stringify as stringifyCsv } from 'csv-stringify/sync';
+import { FrameworkLevelCode, parseLevelCode } from '../levels/frameworkLevelMapping.js';
 
 export type ModuleType = 'core' | 'ai' | 'softskills';
 
 export interface NormalizedKeywordRow {
   readonly track: string;
   readonly level: string;
+  readonly levelCodes: readonly FrameworkLevelCode[];
   readonly moduleType: ModuleType;
   readonly keyword: string;
 }
@@ -119,8 +121,9 @@ function compareNormalizedRows(a: NormalizedKeywordRow, b: NormalizedKeywordRow)
  * normalizeSourceRows: public helper used by other modules.
  */
 export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): readonly NormalizedKeywordRow[] {
-  const normalized: NormalizedKeywordRow[] = [];
+  const normalized: Omit<NormalizedKeywordRow, 'levelCodes'>[] = [];
   const seen = new Set<string>();
+  const keywordToLevelCodes = new Map<string, FrameworkLevelCode[]>();
   let currentTrack = '';
 
   for (const row of rows) {
@@ -130,11 +133,19 @@ export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): reado
     }
 
     const level = (row.Level ?? '').trim();
+    const parsedLevelCode = parseLevelCode(level);
 
     for (const moduleConfig of MODULE_FIELDS) {
       const values = splitAndCleanKeywordCell(row[moduleConfig.field]);
       for (const keyword of values) {
-        const key = `${currentTrack}\u001f${level}\u001f${moduleConfig.moduleType}\u001f${keyword}`;
+        if (parsedLevelCode) {
+          const codes = keywordToLevelCodes.get(keyword) ?? [];
+          if (!codes.includes(parsedLevelCode)) {
+            keywordToLevelCodes.set(keyword, [...codes, parsedLevelCode]);
+          }
+        }
+
+        const key = `${currentTrack}${level}${moduleConfig.moduleType}${keyword}`;
         if (seen.has(key)) {
           continue;
         }
@@ -149,7 +160,12 @@ export function normalizeSourceRows(rows: readonly SourceKeywordCsvRow[]): reado
     }
   }
 
-  return normalized.sort(compareNormalizedRows);
+  return normalized
+    .map((row): NormalizedKeywordRow => ({
+      ...row,
+      levelCodes: keywordToLevelCodes.get(row.keyword) ?? []
+    }))
+    .sort(compareNormalizedRows);
 }
 
 /**
@@ -179,7 +195,15 @@ export async function normalizeKeywordsFile(
   const rows = normalizeKeywordsFromString(sourceContent);
   const csv = stringifyCsv([...rows], {
     header: true,
-    columns: ['track', 'level', 'moduleType', 'keyword']
+    columns: ['track', 'level', 'levelCodes', 'moduleType', 'keyword'],
+    cast: {
+      object(value) {
+        if (Array.isArray(value)) {
+          return value.join('|');
+        }
+        return String(value);
+      }
+    }
   });
 
   try {

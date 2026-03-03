@@ -14,6 +14,7 @@ export interface CourseDetail {
   readonly url: string;
   readonly rating: number | null;
   readonly ratingCount: number | null;
+  readonly udemyLevel: string | null;
 }
 
 interface RuntimeExtraction {
@@ -21,6 +22,7 @@ interface RuntimeExtraction {
   courseId?: number;
   rating?: number;
   ratingCount?: number;
+  instructionalLevel?: string;
   canonicalUrl?: string;
 }
 
@@ -86,7 +88,8 @@ async function extractDetailFromScripts(page: Page, keyword: string, courseUrl: 
     title,
     url: firstNonEmpty(canonical ?? undefined, ldCourse?.url, courseUrl),
     rating: runtimeCourse?.rating ?? ldCourse?.ratingValue ?? null,
-    ratingCount: runtimeCourse?.ratingCount ?? ldCourse?.ratingCount ?? null
+    ratingCount: runtimeCourse?.ratingCount ?? ldCourse?.ratingCount ?? null,
+    udemyLevel: runtimeCourse?.instructionalLevel ?? null
   };
 
   if (!runtimeCourse && !ldCourse) {
@@ -207,6 +210,10 @@ function parseUdRuntimePayload(html: string): RuntimeExtraction | null {
     if (rating !== undefined) { result.rating = rating; }
     const ratingCount = toOptionalNumber(courseObject.num_reviews) ?? toOptionalNumber(courseObject.rating_count);
     if (ratingCount !== undefined) { result.ratingCount = ratingCount; }
+    const instructionalLevel = toOptionalString(courseObject.instructional_level)
+      ?? toOptionalString(courseObject.instructionalLevel)
+      ?? toOptionalString(courseObject.level);
+    if (instructionalLevel) { result.instructionalLevel = instructionalLevel; }
     return result;
   } catch {
     return null;

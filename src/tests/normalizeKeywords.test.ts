@@ -27,14 +27,14 @@ test('normalizes with track carry-forward, splitting, trimming, dedupe and stabl
   const rows = normalizeKeywordsFromString(csv);
 
   assert.deepEqual(rows, [
-    { track: 'Path', level: 'A1', moduleType: 'ai', keyword: 'AI1' },
-    { track: 'Path', level: 'A1', moduleType: 'ai', keyword: 'AI2' },
-    { track: 'Path', level: 'A1', moduleType: 'core', keyword: 'Core1' },
-    { track: 'Path', level: 'A1', moduleType: 'core', keyword: 'Core2' },
-    { track: 'Path', level: 'A1', moduleType: 'softskills', keyword: 'Soft1' },
-    { track: 'Path', level: 'A1', moduleType: 'softskills', keyword: 'Soft2' },
-    { track: 'Path', level: 'A2', moduleType: 'ai', keyword: 'AI3' },
-    { track: 'Path', level: 'A2', moduleType: 'core', keyword: 'Core3' }
+    { track: 'Path', level: 'A1', levelCodes: ['A1'], moduleType: 'ai', keyword: 'AI1' },
+    { track: 'Path', level: 'A1', levelCodes: ['A1'], moduleType: 'ai', keyword: 'AI2' },
+    { track: 'Path', level: 'A1', levelCodes: ['A1'], moduleType: 'core', keyword: 'Core1' },
+    { track: 'Path', level: 'A1', levelCodes: ['A1'], moduleType: 'core', keyword: 'Core2' },
+    { track: 'Path', level: 'A1', levelCodes: ['A1'], moduleType: 'softskills', keyword: 'Soft1' },
+    { track: 'Path', level: 'A1', levelCodes: ['A1'], moduleType: 'softskills', keyword: 'Soft2' },
+    { track: 'Path', level: 'A2', levelCodes: ['A2'], moduleType: 'ai', keyword: 'AI3' },
+    { track: 'Path', level: 'A2', levelCodes: ['A2'], moduleType: 'core', keyword: 'Core3' }
   ]);
 });
 
@@ -47,10 +47,24 @@ test('delimiter heuristic supports comma-delimited file', () => {
   const rows = normalizeKeywordsFromString(csv);
 
   assert.deepEqual(rows, [
-    { track: 'Specialist', level: 'B2', moduleType: 'ai', keyword: 'AI A' },
-    { track: 'Specialist', level: 'B2', moduleType: 'core', keyword: 'Core A' },
-    { track: 'Specialist', level: 'B2', moduleType: 'core', keyword: 'Core B' },
-    { track: 'Specialist', level: 'B2', moduleType: 'softskills', keyword: 'Soft A' },
-    { track: 'Specialist', level: 'B2', moduleType: 'softskills', keyword: 'Soft B' }
+    { track: 'Specialist', level: 'B2', levelCodes: ['B2'], moduleType: 'ai', keyword: 'AI A' },
+    { track: 'Specialist', level: 'B2', levelCodes: ['B2'], moduleType: 'core', keyword: 'Core A' },
+    { track: 'Specialist', level: 'B2', levelCodes: ['B2'], moduleType: 'core', keyword: 'Core B' },
+    { track: 'Specialist', level: 'B2', levelCodes: ['B2'], moduleType: 'softskills', keyword: 'Soft A' },
+    { track: 'Specialist', level: 'B2', levelCodes: ['B2'], moduleType: 'softskills', keyword: 'Soft B' }
+  ]);
+});
+
+test('keyword appearing at multiple levels stores union of level codes in stable order', () => {
+  const csv = [
+    'Track;Level;Core Modules;AI Modules;Softskills',
+    'Path;B1;"Shared";"";""',
+    'Path;C1;"Shared";"";""'
+  ].join('\n');
+
+  const rows = normalizeKeywordsFromString(csv);
+  assert.deepEqual(rows, [
+    { track: 'Path', level: 'B1', levelCodes: ['B1', 'C1'], moduleType: 'core', keyword: 'Shared' },
+    { track: 'Path', level: 'C1', levelCodes: ['B1', 'C1'], moduleType: 'core', keyword: 'Shared' }
   ]);
 });

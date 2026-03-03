@@ -16,6 +16,7 @@ import { enforceSameTabNavigation } from './udemy/navigation.js';
 import { ensureNormalizedKeywords } from './keywords/ensureNormalizedKeywords.js';
 import { loadNormalizedKeywords } from './keywords/loadNormalizedKeywords.js';
 import { createIncrementalCsvWriter } from './io/incrementalCsvWriter.js';
+import { getAllowedInstructionalLevels } from './levels/frameworkLevelMapping.js';
 
 /**
  * printHelp: internal utility for this module.
@@ -107,6 +108,7 @@ async function main(): Promise<void> {
           keywordRow.keyword,
           {
             filters: DEFAULT_FILTERS,
+            allowedInstructionalLevels: getAllowedInstructionalLevels(keywordRow.levelCodes),
             maxCourses: Math.min(cli.maxCoursesPerKeyword, 200),
             maxPages: cli.maxPages,
             throttleMs: cli.throttleMs
