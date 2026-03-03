@@ -22,8 +22,8 @@ import {
 import { sleepLogged, throttled } from '../utils/throttle.js';
 import { isBlockedByKeyword } from './blockedKeywords.js';
 
-const RESULT_WAIT_TIMEOUT_MS = 25_000;
-const LOAD_MORE_WAIT_TIMEOUT_MS = 10_000;
+const RESULT_WAIT_TIMEOUT_MS = 15_000;
+const LOAD_MORE_WAIT_TIMEOUT_MS = 3_000;
 const DEBUG_HREF_LIMIT = 30;
 
 export type CourseUrl = string;
@@ -656,7 +656,7 @@ async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number
       for (let i = 0; i < count; i += 1) {
         const item = candidate.nth(i);
         if (await item.isVisible().catch(() => false) && await item.isEnabled().catch(() => false)) {
-          await throttled(() => item.click({ timeout: 5_000 }), { operationName: 'loadMoreClick', throttleMs, logger });
+          await throttled(() => item.click({ timeout: 3_000 }), { operationName: 'loadMoreClick', throttleMs, logger });
           await sleepLogged(150, logger, 'post-load-more-click', 'loadMoreClick');
           logger.info('Load more action', { keyword, pageIndex, action: 'click' });
           return true;
