@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { REJECTION_REASON, canonicalizeUrl, computeEligibility } from '../udemy/scrapeKeyword.js';
+import { canonicalizeUrl, computeEligibility } from '../udemy/scrapeKeyword.js';
 import { buildSearchUrl } from '../udemy/navigation.js';
 
 test('canonicalizeUrl normalizes relative course URLs and strips query/hash', () => {
@@ -51,7 +51,8 @@ test('computeEligibility only uses rating and ratingCount thresholds', () => {
   });
 });
 
-test('computeEligibility accepts missing detail level when search already constrained instructional levels', () => {
+
+test('computeEligibility ignores instructional level from detail page', () => {
   assert.deepEqual(
     computeEligibility({
       rating: 4.8,
@@ -64,31 +65,10 @@ test('computeEligibility accepts missing detail level when search already constr
     }),
     {
       eligible: true,
-      reason: null,
-      acceptedDueToSearchLevelFiltering: true
-    }
-  );
-});
-
-test('computeEligibility accepts known allowed instructional level when constrained', () => {
-  assert.deepEqual(
-    computeEligibility({
-      rating: 4.8,
-      ratingCount: 5000,
-      allowedInstructionalLevels: ['beginner', 'intermediate'],
-      udemyLevel: 'Intermediate Level',
-      eligibilityContext: {
-        requestedInstructionalLevels: ['beginner', 'intermediate']
-      }
-    }),
-    {
-      eligible: true,
       reason: null
     }
   );
-});
 
-test('computeEligibility rejects known disallowed instructional level when constrained', () => {
   assert.deepEqual(
     computeEligibility({
       rating: 4.8,
@@ -100,27 +80,11 @@ test('computeEligibility rejects known disallowed instructional level when const
       }
     }),
     {
-      eligible: false,
-      reason: REJECTION_REASON.INSTRUCTIONAL_LEVEL_NOT_ALLOWED
+      eligible: true,
+      reason: null
     }
   );
 });
-
-test('computeEligibility still rejects unknown level when no search-level filter context is available', () => {
-  assert.deepEqual(
-    computeEligibility({
-      rating: 4.8,
-      ratingCount: 5000,
-      allowedInstructionalLevels: ['beginner'],
-      udemyLevel: null
-    }),
-    {
-      eligible: false,
-      reason: REJECTION_REASON.MISSING_OR_UNKNOWN_INSTRUCTIONAL_LEVEL
-    }
-  );
-});
-
 
 
 test('buildSearchUrl rounds minRating down to one decimal for ratings param', () => {

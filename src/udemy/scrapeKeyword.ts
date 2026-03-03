@@ -291,26 +291,6 @@ export function computeEligibility(
     return { eligible: false, reason: REJECTION_REASON.RATING_COUNT_BELOW_MIN };
   }
 
-  if (input.allowedInstructionalLevels && input.allowedInstructionalLevels.length > 0) {
-    const normalizedUdemyLevel = input.udemyLevel ? mapUdemyInstructionalLevel(input.udemyLevel) : null;
-    if (!normalizedUdemyLevel) {
-      const hasSearchLevelConstraint = (input.eligibilityContext?.requestedInstructionalLevels.length ?? 0) > 0;
-      if (hasSearchLevelConstraint) {
-        // Search URL already constrained instructional levels; when detail metadata is absent,
-        // keep the course and treat level as unknown-but-search-filtered.
-        return {
-          eligible: true,
-          reason: null,
-          acceptedDueToSearchLevelFiltering: true
-        };
-      }
-      return { eligible: false, reason: REJECTION_REASON.MISSING_OR_UNKNOWN_INSTRUCTIONAL_LEVEL };
-    }
-    if (!input.allowedInstructionalLevels.includes(normalizedUdemyLevel)) {
-      return { eligible: false, reason: REJECTION_REASON.INSTRUCTIONAL_LEVEL_NOT_ALLOWED };
-    }
-  }
-
   return { eligible: true, reason: null };
 }
 
