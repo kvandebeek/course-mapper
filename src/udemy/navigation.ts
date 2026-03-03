@@ -117,7 +117,7 @@ export async function gotoWithRetries(
       ) {
         throw new Error('Not authenticated');
       }
-      const response = await page.waitForResponse((response) => response.url() === page.url(), { timeout: 1_500 }).catch(() => null);
+      const response = await page.waitForResponse((response) => response.url() === page.url(), { timeout: 50 }).catch(() => null);
       const status = response?.status();
       if (status === 403 || status === 429) {
         const error = new Error(`Navigation blocked with status ${status}`) as Error & { status: number };

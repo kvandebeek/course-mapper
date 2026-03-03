@@ -93,7 +93,7 @@ export function getCliOptions(argv: string[]): CliOptions {
     browserChannel: 'chrome',
     maxCoursesPerKeyword: 200,
     maxPages: 15,
-    throttleMs: 500,
+    throttleMs: 275,
     concurrency: 1,
     profileDir: './artifacts/profile',
     allCoursesDedupe: 'none'

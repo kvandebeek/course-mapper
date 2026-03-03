@@ -113,7 +113,7 @@ export async function collectCourseUrlsForKeyword(
 
   try {
     await gotoWithRetries(page, baseSearchUrl, { operationName: 'openSearchPage', throttleMs: opts.throttleMs, logger });
-    await sleepLogged(150, logger, 'post-search-page-buffer', 'openSearchPage');
+    await sleepLogged(50, logger, 'post-search-page-buffer', 'openSearchPage');
     await waitForSearchResultsUi(page, opts.throttleMs, logger);
   } catch (error) {
     await writeNavigationFailureArtifacts(page, 'search_nav_fail', baseSearchUrl, error, keyword);
@@ -225,7 +225,7 @@ export async function collectAndRankTopCourses(
       });
       let detail = detailCache.get(courseUrl);
       if (!detail) {
-        await sleepLogged(150, logger, 'pre-detail-navigation', 'openDetailPage');
+        await sleepLogged(50, logger, 'pre-detail-navigation', 'openDetailPage');
         await gotoWithRetries(page, courseUrl, { operationName: 'openDetailPage', throttleMs: opts.throttleMs, logger });
         logger.info('Opening detail page', { keyword, courseUrl, currentUrl: page.url() });
 
@@ -672,7 +672,7 @@ async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number
         const item = candidate.nth(i);
         if (await item.isVisible().catch(() => false) && await item.isEnabled().catch(() => false)) {
           await throttled(() => item.click({ timeout: 3_000 }), { operationName: 'loadMoreClick', throttleMs, logger });
-          await sleepLogged(150, logger, 'post-load-more-click', 'loadMoreClick');
+          await sleepLogged(50, logger, 'post-load-more-click', 'loadMoreClick');
           logger.info('Load more action', { keyword, pageIndex, action: 'click' });
           return true;
         }
@@ -682,7 +682,7 @@ async function tryLoadMoreResults(page: Page, keyword: string, pageIndex: number
     await throttled(async () => page.evaluate(() => {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'auto' });
     }), { operationName: 'loadMoreScroll', throttleMs, logger });
-    await sleepLogged(150, logger, 'post-load-more-scroll', 'loadMoreScroll');
+    await sleepLogged(50, logger, 'post-load-more-scroll', 'loadMoreScroll');
     logger.info('Load more action', { keyword, pageIndex, action: 'scroll' });
     return true;
   } catch (error) {

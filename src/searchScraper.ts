@@ -205,7 +205,7 @@ export async function scrapeKeywordCourses(
       break;
     }
 
-    await sleepWithJitter(params.throttleMs, 100, 200);
+    await sleepWithJitter(params.throttleMs, 25, 50);
   }
 
   const courses = [...courseMap.values()].slice(0, params.maxCoursesPerKeyword);
@@ -295,7 +295,7 @@ async function recoverUnavailableSearch(page: Page, keyword: string, pageNum: nu
   for (let retry = 1; retry <= 3; retry += 1) {
     const backoffBase = 1500 * 2 ** (retry - 1);
     logger.warn('Search is currently unavailable; retrying page', { keyword, pageNum, retry, backoffBaseMs: backoffBase });
-    await sleepWithJitter(backoffBase, 100, 200);
+    await sleepWithJitter(backoffBase, 50, 100);
     await page.reload({ waitUntil: 'domcontentloaded' });
     if (!(await isSearchUnavailable(page))) {
       return true;

@@ -7,9 +7,9 @@
 
 import { Logger } from '../logger.js';
 
-const DEFAULT_JITTER_RATIO = 0.20;
-const DEFAULT_BACKOFF_BASE_MS = 1_000;
-const DEFAULT_BACKOFF_MAX_MS = 15_000;
+const DEFAULT_JITTER_RATIO = 0.15;
+const DEFAULT_BACKOFF_BASE_MS = 150;
+const DEFAULT_BACKOFF_MAX_MS = 2_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 /**
@@ -29,11 +29,11 @@ export async function sleepLogged(
   operationName?: string
 ): Promise<void> {
   const sleepMsClamped = Math.max(0, ms);
-  logger?.info('Sleep scheduled', {
+  /*logger?.info('Sleep scheduled', {
     reason,
     sleepMs: sleepMsClamped,
     ...(operationName ? { operationName } : {})
-  });
+  });*/
   await sleepMs(sleepMsClamped);
 }
 
