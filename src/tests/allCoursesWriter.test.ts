@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ALL_COURSES_HEADERS, initAllCoursesWriter } from '../output/allCoursesWriter.js';
 
 const BASE_ROW = {
-  runId: '2026-03-03T14:20:00.000Z',
   keyword: 'python',
   courseTitle: 'Intro Course',
   courseUrl: 'https://resillion.udemy.com/course/intro/',
@@ -56,6 +55,21 @@ test('all courses writer appends to existing file without duplicating header', a
   assert.equal(lines.filter((line) => line === ALL_COURSES_HEADERS.join(',')).length, 1);
 });
 
+test('all courses writer uses v2 file when existing header has old runId schema', async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'all-courses-mismatch-'));
+  const outputFilePath = path.join(tempDir, 'all_courses.csv');
+  await writeFile(outputFilePath, 'runId,keyword\nlegacy,data\n', 'utf-8');
+
+  const writer = await initAllCoursesWriter(outputFilePath);
+  assert.equal(writer.outputFilePath, path.join(tempDir, 'all_courses_v2.csv'));
+
+  await writer.appendInspectedCourse(BASE_ROW);
+  await writer.close();
+
+  const v2Content = await readFile(writer.outputFilePath, 'utf-8');
+  assert.equal(v2Content.trimEnd().split('\n')[0], ALL_COURSES_HEADERS.join(','));
+});
+
 test('all courses writer escapes commas, quotes, and newlines', async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'all-courses-escape-'));
   const outputFilePath = path.join(tempDir, 'all_courses.csv');
@@ -69,6 +83,30 @@ test('all courses writer escapes commas, quotes, and newlines', async () => {
 
   const content = await readFile(outputFilePath, 'utf-8');
   assert.match(content, /"Course, ""Quoted""\nTitle"/);
+});
+
+test('all courses writer adds per-row timeAdded in ISO UTC ms format and in append order', async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'all-courses-time-added-'));
+  const outputFilePath = path.join(tempDir, 'all_courses.csv');
+
+  const writer = await initAllCoursesWriter(outputFilePath);
+  await writer.appendInspectedCourse(BASE_ROW);
+  await writer.appendInspectedCourse({ ...BASE_ROW, status: 'accepted', courseUrl: 'https://resillion.udemy.com/course/accepted/' });
+  await writer.close();
+
+  const content = await readFile(outputFilePath, 'utf-8');
+  const [header, firstData, secondData] = content.trimEnd().split('\n');
+
+  assert.match(header ?? '', /^timeAdded,/);
+  assert.equal(header?.includes('runId'), false);
+
+  const [firstTimeAdded] = (firstData ?? '').split(',');
+  const [secondTimeAdded] = (secondData ?? '').split(',');
+  const isoUtcMsRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+  assert.match(firstTimeAdded ?? '', isoUtcMsRegex);
+  assert.match(secondTimeAdded ?? '', isoUtcMsRegex);
+  assert.ok(Date.parse(firstTimeAdded ?? '') <= Date.parse(secondTimeAdded ?? ''));
 });
 
 test('all courses writer serializes concurrent appends with stable call order', async () => {

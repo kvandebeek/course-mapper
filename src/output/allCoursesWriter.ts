@@ -5,12 +5,13 @@
  * outcomes per keyword so reviewers can explain why shortlist rows were kept or
  * filtered out. Optional per-run dedupe suppresses duplicate status rows.
  */
-import { appendFile, mkdir, stat } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, stat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { escapeCsvField } from '../io/incrementalCsvWriter.js';
+import { nowIsoUtcMs } from '../utils/date.js';
 
 export const ALL_COURSES_HEADERS = [
-  'runId',
+  'timeAdded',
   'keyword',
   'courseTitle',
   'courseUrl',
@@ -27,7 +28,7 @@ export type AllCoursesStatus = 'inspected' | 'accepted' | 'rejected';
 export type AllCoursesDedupeMode = 'none' | 'perRun';
 
 export type AllCoursesRow = Readonly<{
-  runId: string;
+  timeAdded: string;
   keyword: string;
   courseTitle: string;
   courseUrl: string;
@@ -35,17 +36,48 @@ export type AllCoursesRow = Readonly<{
   ratingCount: number | '';
   courseInstructionalLevel: string;
   durationMinutes: number | '';
-  lastUpdated: string;
+  lastUpdated: string | '';
   status: AllCoursesStatus;
-  failureReason: string;
+  failureReason: string | '';
 }>;
+
+export type AllCoursesAppendInput = Omit<AllCoursesRow, 'timeAdded'>;
 
 export type AllCoursesWriter = {
   readonly outputFilePath: string;
   readonly fileExisted: boolean;
-  appendInspectedCourse(row: AllCoursesRow): Promise<boolean>;
+  appendInspectedCourse(row: AllCoursesAppendInput): Promise<boolean>;
   close(): Promise<void>;
 };
+
+function getV2Path(originalPath: string): string {
+  const ext = path.extname(originalPath);
+  const withoutExt = ext ? originalPath.slice(0, -ext.length) : originalPath;
+  return `${withoutExt}_v2${ext || '.csv'}`;
+}
+
+async function resolveAuditOutputPath(resolvedPath: string): Promise<string> {
+  const fileStats = await stat(resolvedPath).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  });
+
+  if (fileStats === null || fileStats.size === 0) {
+    return resolvedPath;
+  }
+
+  const content = await readFile(resolvedPath, 'utf-8');
+  const header = content.split(/\r?\n/, 1)[0]?.trimEnd() ?? '';
+  const expectedHeader = ALL_COURSES_HEADERS.join(',');
+
+  if (header === expectedHeader) {
+    return resolvedPath;
+  }
+
+  return getV2Path(resolvedPath);
+}
 
 /**
  * Initializes the all-courses audit writer.
@@ -54,7 +86,8 @@ export async function initAllCoursesWriter(
   outputFilePath: string,
   options?: { dedupeMode?: AllCoursesDedupeMode }
 ): Promise<AllCoursesWriter> {
-  const resolvedPath = path.resolve(outputFilePath);
+  const requestedPath = path.resolve(outputFilePath);
+  const resolvedPath = await resolveAuditOutputPath(requestedPath);
   const dedupeMode = options?.dedupeMode ?? 'none';
   const seenInRun = dedupeMode === 'perRun' ? new Set<string>() : null;
 
@@ -80,7 +113,7 @@ export async function initAllCoursesWriter(
     return next;
   }
 
-  async function appendInspectedCourse(row: AllCoursesRow): Promise<boolean> {
+  async function appendInspectedCourse(row: AllCoursesAppendInput): Promise<boolean> {
     return queueWrite(async () => {
       if (seenInRun) {
         const dedupeKey = `${row.keyword}|${row.courseUrl}|${row.status}`;
@@ -90,7 +123,11 @@ export async function initAllCoursesWriter(
         seenInRun.add(dedupeKey);
       }
 
-      const line = `${ALL_COURSES_HEADERS.map((header) => escapeCsvField(String(row[header] ?? ''))).join(',')}\n`;
+      const rowToWrite: AllCoursesRow = {
+        timeAdded: nowIsoUtcMs(),
+        ...row
+      };
+      const line = `${ALL_COURSES_HEADERS.map((header) => escapeCsvField(String(rowToWrite[header] ?? ''))).join(',')}\n`;
       await appendFile(resolvedPath, line, 'utf-8');
       return true;
     });

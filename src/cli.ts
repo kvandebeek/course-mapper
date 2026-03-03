@@ -97,7 +97,6 @@ async function main(): Promise<void> {
       headers: ['track', 'level', 'moduleType', 'keyword', 'courseInstructionalLevel', 'courseTitle', 'courseUrl', 'rating', 'ratingCount', 'duration', 'durationTotalMinutes']
     });
 
-    const runId = new Date().toISOString();
     const allCoursesPath = resolvePath('./artifacts/udemy/all_courses.csv');
     const allCoursesWriter = await initAllCoursesWriter(allCoursesPath, { dedupeMode: cli.allCoursesDedupe ?? 'none' });
     const allCoursesCounts = {
@@ -109,7 +108,6 @@ async function main(): Promise<void> {
     logger.info('All courses audit log initialized', {
       path: allCoursesWriter.outputFilePath,
       mode: allCoursesWriter.fileExisted ? 'append' : 'created',
-      runId,
       dedupeMode: cli.allCoursesDedupe ?? 'none'
     });
 
@@ -153,7 +151,6 @@ async function main(): Promise<void> {
             throttleMs: cli.throttleMs,
             onCourseInspected: async (event) => {
               const appended = await allCoursesWriter.appendInspectedCourse({
-                runId,
                 keyword: event.keyword,
                 courseTitle: event.courseTitle,
                 courseUrl: event.courseUrl,
@@ -171,7 +168,6 @@ async function main(): Promise<void> {
             },
             onCourseOutcome: async (event) => {
               const appended = await allCoursesWriter.appendInspectedCourse({
-                runId,
                 keyword: event.keyword,
                 courseTitle: event.courseTitle,
                 courseUrl: event.courseUrl,
@@ -238,7 +234,6 @@ async function main(): Promise<void> {
 
     logger.info('All courses audit log summary', {
       path: allCoursesWriter.outputFilePath,
-      runId,
       inspectedRowsAppended: allCoursesCounts.inspected,
       acceptedRowsAppended: allCoursesCounts.accepted,
       rejectedRowsAppended: allCoursesCounts.rejected
