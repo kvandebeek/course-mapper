@@ -11,12 +11,14 @@ import { Page } from 'playwright';
 import { Logger } from '../logger.js';
 import { extractCourseDetail, CourseDetail } from './extractCourseDetail.js';
 import {
+  InstructionalLevel,
   SearchFilters,
   buildSearchUrl,
   gotoWithRetries,
   writeNavigationFailureArtifacts
 } from './navigation.js';
 import { sleepMs, throttled } from '../utils/throttle.js';
+import { mapUdemyInstructionalLevel } from './instructionalLevel.js';
 
 const RESULT_WAIT_TIMEOUT_MS = 25_000;
 const LOAD_MORE_WAIT_TIMEOUT_MS = 10_000;
@@ -30,6 +32,8 @@ export const DEFAULT_FILTERS: SearchFilters = {
   sort: 'relevance'
 };
 
+export type AllowedInstructionalLevel = Exclude<InstructionalLevel, 'all'>;
+
 /**
  * collectCourseUrlsForKeyword: public helper used by other modules.
  */
@@ -38,13 +42,17 @@ export async function collectCourseUrlsForKeyword(
   keyword: string,
   opts: {
     readonly filters: SearchFilters;
+    readonly allowedInstructionalLevels?: readonly AllowedInstructionalLevel[];
     readonly maxCourses: number;
     readonly maxPages: number;
     readonly throttleMs: number;
   },
   logger: Logger
 ): Promise<readonly string[]> {
-  const baseSearchUrl = buildSearchUrl(keyword, opts.filters);
+  const mergedFilters: SearchFilters = opts.allowedInstructionalLevels && opts.allowedInstructionalLevels.length > 0
+    ? { ...opts.filters, instructionalLevels: opts.allowedInstructionalLevels }
+    : opts.filters;
+  const baseSearchUrl = buildSearchUrl(keyword, mergedFilters);
   logger.info('Keyword URL collection started', { keyword, baseSearchUrl });
 
   const unique = new Set<CourseUrl>();
@@ -103,6 +111,7 @@ export async function collectAndRankTopCourses(
   keyword: string,
   opts: {
     readonly filters: SearchFilters;
+    readonly allowedInstructionalLevels?: readonly AllowedInstructionalLevel[];
     readonly maxCourses: number;
     readonly maxPages: number;
     readonly throttleMs: number;
@@ -153,7 +162,9 @@ export async function collectAndRankTopCourses(
       });
       const eligibility = computeEligibility({
         rating: detail.rating,
-        ratingCount: detail.ratingCount
+        ratingCount: detail.ratingCount,
+        udemyLevel: detail.udemyLevel,
+        ...(opts.allowedInstructionalLevels ? { allowedInstructionalLevels: opts.allowedInstructionalLevels } : {})
       });
 
       logger.info('Computed filters', {
@@ -204,7 +215,7 @@ export async function collectAndRankTopCourses(
   return rankCourses(details).slice(0, 3);
 }
 
-export type FailureReason = 'rating_below_min' | 'rating_count_below_min';
+export type FailureReason = 'rating_below_min' | 'rating_count_below_min' | 'missing_or_unknown_instructional_level' | 'instructional_level_not_allowed';
 
 export type Eligibility = Readonly<{
   eligible: boolean;
@@ -214,7 +225,14 @@ export type Eligibility = Readonly<{
 /**
  * computeEligibility: public helper used by other modules.
  */
-export function computeEligibility(input: Readonly<{ rating: number | null; ratingCount: number | null }>): Eligibility {
+export function computeEligibility(
+  input: Readonly<{
+    rating: number | null;
+    ratingCount: number | null;
+    udemyLevel?: string | null;
+    allowedInstructionalLevels?: readonly AllowedInstructionalLevel[];
+  }>
+): Eligibility {
   const minRating = 4.5;
   const minRatingCount = 1500;
 
@@ -227,6 +245,16 @@ export function computeEligibility(input: Readonly<{ rating: number | null; rati
 
   if (ratingCount < minRatingCount) {
     return { eligible: false, reason: 'rating_count_below_min' };
+  }
+
+  if (input.allowedInstructionalLevels && input.allowedInstructionalLevels.length > 0) {
+    const normalizedUdemyLevel = input.udemyLevel ? mapUdemyInstructionalLevel(input.udemyLevel) : null;
+    if (!normalizedUdemyLevel) {
+      return { eligible: false, reason: 'missing_or_unknown_instructional_level' };
+    }
+    if (!input.allowedInstructionalLevels.includes(normalizedUdemyLevel)) {
+      return { eligible: false, reason: 'instructional_level_not_allowed' };
+    }
   }
 
   return { eligible: true, reason: null };

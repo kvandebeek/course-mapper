@@ -34,6 +34,7 @@ export interface AppConfig {
 export interface KeywordRow {
   track: string;
   level: string;
+  levelCodes: string;
   moduleType: string;
   keyword: string;
 }

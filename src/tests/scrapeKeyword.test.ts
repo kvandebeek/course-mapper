@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { canonicalizeUrl, computeEligibility } from '../udemy/scrapeKeyword.js';
+import { buildSearchUrl } from '../udemy/navigation.js';
 
 test('canonicalizeUrl normalizes relative course URLs and strips query/hash', () => {
   const normalized = canonicalizeUrl('/course/testing-101/?couponCode=abc#section', 'https://resillion.udemy.com/organization/search/?q=test');
@@ -48,4 +49,57 @@ test('computeEligibility only uses rating and ratingCount thresholds', () => {
     eligible: false,
     reason: 'rating_below_min'
   });
+});
+
+test('computeEligibility rejects missing or disallowed instructional levels when constrained', () => {
+  assert.deepEqual(
+    computeEligibility({
+      rating: 4.8,
+      ratingCount: 5000,
+      allowedInstructionalLevels: ['beginner'],
+      udemyLevel: null
+    }),
+    {
+      eligible: false,
+      reason: 'missing_or_unknown_instructional_level'
+    }
+  );
+
+  assert.deepEqual(
+    computeEligibility({
+      rating: 4.8,
+      ratingCount: 5000,
+      allowedInstructionalLevels: ['beginner'],
+      udemyLevel: 'Expert'
+    }),
+    {
+      eligible: false,
+      reason: 'instructional_level_not_allowed'
+    }
+  );
+
+  assert.deepEqual(
+    computeEligibility({
+      rating: 4.8,
+      ratingCount: 5000,
+      allowedInstructionalLevels: ['beginner', 'intermediate'],
+      udemyLevel: 'Intermediate Level'
+    }),
+    {
+      eligible: true,
+      reason: null
+    }
+  );
+});
+
+test('buildSearchUrl appends multiple instructional_level params', () => {
+  const url = buildSearchUrl('python', {
+    minRating: 4.6,
+    lang: 'en',
+    instructionalLevels: ['beginner', 'intermediate'],
+    sort: 'relevance'
+  });
+
+  const parsed = new URL(url);
+  assert.deepEqual(parsed.searchParams.getAll('instructional_level'), ['beginner', 'intermediate']);
 });

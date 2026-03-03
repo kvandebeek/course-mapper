@@ -8,13 +8,33 @@
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { parse as parseCsv } from 'csv-parse/sync';
+import { FrameworkLevelCode, parseLevelCode } from '../levels/frameworkLevelMapping.js';
 import { ModuleType, NormalizedKeywordRow } from './normalizeKeywords.js';
 
 interface RawNormalizedRow {
   readonly track?: string;
   readonly level?: string;
+  readonly levelCodes?: string;
   readonly moduleType?: string;
   readonly keyword?: string;
+}
+
+/**
+ * parseLevelCodesField: internal utility for this module.
+ */
+function parseLevelCodesField(value: string | undefined): readonly FrameworkLevelCode[] {
+  if (!value) {
+    return [];
+  }
+
+  const codes: FrameworkLevelCode[] = [];
+  for (const token of value.split('|')) {
+    const parsed = parseLevelCode(token);
+    if (parsed && !codes.includes(parsed)) {
+      codes.push(parsed);
+    }
+  }
+  return codes;
 }
 
 /**
@@ -56,6 +76,7 @@ export async function loadNormalizedKeywords(normalizedFile: string): Promise<re
       return {
         track: (row.track ?? '').trim(),
         level: (row.level ?? '').trim(),
+        levelCodes: parseLevelCodesField(row.levelCodes),
         moduleType,
         keyword
       };

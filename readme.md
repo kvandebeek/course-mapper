@@ -73,8 +73,16 @@ Run `npm run scrape -- --help` for a quick runtime summary.
 `keywords-list.csv` with headers:
 
 ```csv
-track,level,moduleType,keyword
+Track,Level,Core Modules,AI Modules,Softskills
 ```
+
+The normalization step writes `artifacts/keywords.normalized.csv` with headers:
+
+```csv
+track,level,levelCodes,moduleType,keyword
+```
+
+`levelCodes` is a pipe-delimited set (for example `B1|C1`) used to derive allowed Udemy instructional levels per keyword.
 
 ### Output
 
