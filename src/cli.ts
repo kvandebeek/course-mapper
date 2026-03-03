@@ -12,6 +12,7 @@ import { initAuthenticatedSession } from './auth.js';
 import { ExportRow } from './types.js';
 import { createSessionManager } from './runtime/sessionManager.js';
 import { DEFAULT_FILTERS, collectAndRankTopCourses } from './udemy/scrapeKeyword.js';
+import { mapUdemyInstructionalLevel } from './udemy/instructionalLevel.js';
 import { enforceSameTabNavigation } from './udemy/navigation.js';
 import { ensureNormalizedKeywords } from './keywords/ensureNormalizedKeywords.js';
 import { loadNormalizedKeywords } from './keywords/loadNormalizedKeywords.js';
@@ -89,7 +90,7 @@ async function main(): Promise<void> {
     await rm(outputCsvPath, { force: true });
     const writer = createIncrementalCsvWriter({
       outputFilePath: outputCsvPath,
-      headers: ['keyword', 'courseTitle', 'courseUrl', 'rating', 'ratingCount']
+      headers: ['track', 'level', 'moduleType', 'keyword', 'courseInstructionalLevel', 'courseTitle', 'courseUrl', 'rating', 'ratingCount']
     });
 
     const finalRows: ExportRow[] = [];
@@ -118,7 +119,11 @@ async function main(): Promise<void> {
 
         for (const course of topCourses) {
           const row: ExportRow = {
+            track: keywordRow.track,
+            level: keywordRow.level,
+            moduleType: keywordRow.moduleType,
             keyword: keywordRow.keyword,
+            courseInstructionalLevel: mapUdemyInstructionalLevel(course.udemyLevel ?? '') ?? 'all',
             courseTitle: course.title,
             courseUrl: course.url,
             rating: course.rating ?? 0,

@@ -86,9 +86,13 @@ track,level,levelCodes,moduleType,keyword
 
 ### Output
 
-`artifacts/udemy/top_courses.csv` with at least:
+`artifacts/udemy/top_courses.csv` with columns:
 
+- `track`
+- `level`
+- `moduleType`
 - `keyword`
+- `courseInstructionalLevel`
 - `courseTitle`
 - `courseUrl`
 - `rating`

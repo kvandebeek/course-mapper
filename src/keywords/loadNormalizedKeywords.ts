@@ -38,10 +38,16 @@ function parseLevelCodesField(value: string | undefined): readonly FrameworkLeve
 }
 
 /**
- * isModuleType: internal utility for this module.
+ * parseModuleType: internal utility for this module.
  */
-function isModuleType(value: string): value is ModuleType {
-  return value === 'core' || value === 'ai' || value === 'softskills';
+function parseModuleType(value: string, normalizedPath: string, rowNumber: number): ModuleType {
+  if (value === 'core' || value === 'ai' || value === 'softskills') {
+    return value;
+  }
+
+  throw new Error(
+    `Invalid normalized keyword row at ${normalizedPath} row ${rowNumber}: moduleType must be one of core|ai|softskills (received "${value}")`
+  );
 }
 
 /**
@@ -63,23 +69,21 @@ export async function loadNormalizedKeywords(normalizedFile: string): Promise<re
     trim: true
   }) as RawNormalizedRow[];
 
-  return rows
-    .map((row): NormalizedKeywordRow | null => {
-      const moduleType = (row.moduleType ?? '').trim();
-      if (!isModuleType(moduleType)) {
-        return null;
-      }
-      const keyword = (row.keyword ?? '').trim();
-      if (keyword.length === 0) {
-        return null;
-      }
-      return {
-        track: (row.track ?? '').trim(),
-        level: (row.level ?? '').trim(),
-        levelCodes: parseLevelCodesField(row.levelCodes),
-        moduleType,
-        keyword
-      };
-    })
-    .filter((row): row is NormalizedKeywordRow => row !== null);
+  return rows.map((row, index): NormalizedKeywordRow => {
+    const rowNumber = index + 2;
+    const keyword = (row.keyword ?? '').trim();
+    if (keyword.length === 0) {
+      throw new Error(`Invalid normalized keyword row at ${normalizedPath} row ${rowNumber}: keyword is required`);
+    }
+
+    const moduleType = parseModuleType((row.moduleType ?? '').trim(), normalizedPath, rowNumber);
+
+    return {
+      track: (row.track ?? '').trim(),
+      level: (row.level ?? '').trim(),
+      levelCodes: parseLevelCodesField(row.levelCodes),
+      moduleType,
+      keyword
+    };
+  });
 }

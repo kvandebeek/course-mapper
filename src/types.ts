@@ -31,16 +31,22 @@ export interface AppConfig {
   minRatingCount: number;
 }
 
+export type ModuleType = 'core' | 'ai' | 'softskills';
+
 export interface KeywordRow {
-  track: string;
-  level: string;
-  levelCodes: string;
-  moduleType: string;
-  keyword: string;
+  readonly track: string;
+  readonly level: string;
+  readonly levelCodes: readonly string[];
+  readonly moduleType: ModuleType;
+  readonly keyword: string;
 }
 
 export type ExportRow = {
+  readonly track: string;
+  readonly level: string;
+  readonly moduleType: ModuleType;
   readonly keyword: string;
+  readonly courseInstructionalLevel: 'all' | 'beginner' | 'intermediate' | 'expert';
   readonly courseTitle: string;
   readonly courseUrl: string;
   readonly rating: number;
@@ -64,7 +70,7 @@ export interface CourseRaw {
 export interface CourseScored extends CourseRaw {
   track: string;
   level: string;
-  moduleType: string;
+  moduleType: ModuleType;
   score: number;
   failureReason?: string;
 }
