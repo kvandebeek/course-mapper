@@ -1,5 +1,5 @@
 artifacts/
 input/
 node_modules/
-readme.md
-README.md
+./readme.md
+./README.md
