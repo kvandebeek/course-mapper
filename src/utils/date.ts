@@ -26,3 +26,10 @@ export function getNowInBrussels(): Date {
   const localeString = now.toLocaleString('en-US', { timeZone: 'Europe/Brussels' });
   return new Date(localeString);
 }
+
+/**
+ * nowIsoUtcMs: public helper used for CSV write timestamps.
+ */
+export function nowIsoUtcMs(): string {
+  return new Date().toISOString();
+}
