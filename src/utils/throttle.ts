@@ -8,8 +8,8 @@
 import { Logger } from '../logger.js';
 
 const DEFAULT_JITTER_RATIO = 0.15;
-const DEFAULT_BACKOFF_BASE_MS = 150;
-const DEFAULT_BACKOFF_MAX_MS = 2_000;
+const DEFAULT_BACKOFF_BASE_MS = 25;
+const DEFAULT_BACKOFF_MAX_MS = 200;
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 /**

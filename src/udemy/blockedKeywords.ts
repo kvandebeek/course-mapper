@@ -194,7 +194,11 @@ export const DISALLOWED_TITLE_KEYWORDS = [
   'Apple',
   'Samsung',
   'Design Pattern',
-  'Refactoring'
+  'Refactoring',
+  'MLOps',
+  'n8n',
+  'Zero to Hero'
+
 ] as const;
 
 export interface BlockedKeywordResult {
