@@ -1,8 +1,14 @@
 /**
- * src/config.ts
+ * CLI/runtime configuration parser and default application settings.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * Responsibilities:
+ * - Parse supported CLI flags used by `src/cli.ts`.
+ * - Validate constrained enums (browser channel, duration buckets, dedupe mode).
+ * - Provide hardcoded app defaults for tenant URL, filter thresholds, and paths.
+ *
+ * Notable behavior:
+ * - `--concurrency` is accepted but intentionally pinned to sequential mode (`1`).
+ * - Empty `--durations` means "use config defaults" rather than "disable duration filtering".
  */
 
 import * as path from 'node:path';

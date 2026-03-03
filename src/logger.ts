@@ -1,10 +1,20 @@
 /**
- * src/logger.ts
+ * Central structured logger used by the CLI and scraping modules.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * Responsibilities:
+ * - Emit timestamped log lines in a stable text format.
+ * - Keep debug noise opt-in while preserving INFO/WARN/ERROR by default.
+ * - Accept optional structured metadata so rejection reasons and throttle events
+ *   remain traceable in run logs.
+ *
+ * Invariants:
+ * - Logging never throws on its own.
+ * - Every message includes an ISO timestamp and level marker.
  */
 
+/**
+ * Minimal logger contract shared across modules.
+ */
 export interface Logger {
   info(message: string, data?: Record<string, unknown>): void;
   warn(message: string, data?: Record<string, unknown>): void;
@@ -13,12 +23,12 @@ export interface Logger {
 }
 
 /**
- * createLogger: public helper used by other modules.
+ * Creates a console-backed logger.
  */
 export function createLogger(debugEnabled: boolean): Logger {
-/**
- * log: internal utility for this module.
- */
+  /**
+   * Writes a single structured log line.
+   */
   function log(level: string, message: string, data?: Record<string, unknown>): void {
     const timestamp = new Date().toISOString();
     const payload = data ? ` ${JSON.stringify(data)}` : '';

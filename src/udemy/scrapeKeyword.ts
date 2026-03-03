@@ -1,8 +1,15 @@
 /**
- * src/udemy/scrapeKeyword.ts
+ * Keyword-level Udemy course discovery and ranking pipeline.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * Responsibilities:
+ * - Build filtered search URLs (including instructional-level constraints).
+ * - Collect unique candidate course URLs across pagination/load-more actions.
+ * - Extract detail pages, evaluate eligibility, and compute ranking scores.
+ * - Emit explicit rejection reasons to support auditability.
+ *
+ * Determinism:
+ * - URL canonicalization strips query/hash and dedupes by canonical URL.
+ * - Ranking is applied after deterministic eligibility filtering.
  */
 
 import * as fs from 'node:fs/promises';
@@ -160,7 +167,12 @@ export async function collectCourseUrlsForKeyword(
 }
 
 /**
- * collectAndRankTopCourses: public helper used by other modules.
+ * Collects candidate courses for a keyword and returns accepted courses ranked by score.
+ *
+ * Filtering performed here:
+ * - blocked-title keyword exclusions,
+ * - minimum rating and rating-count thresholds (`computeEligibility`),
+ * - instructional-level compatibility via scoring guardrails.
  */
 export async function collectAndRankTopCourses(
   page: Page,
@@ -425,7 +437,10 @@ export type Eligibility = Readonly<{
 }>;
 
 /**
- * computeEligibility: public helper used by other modules.
+ * Computes hard eligibility gates applied before ranking.
+ *
+ * A course is accepted only when both rating and rating count meet thresholds;
+ * otherwise an explicit rejection reason is returned for audit logging.
  */
 export function computeEligibility(
   input: Readonly<{

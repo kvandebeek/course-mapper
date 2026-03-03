@@ -1,3 +1,9 @@
+/**
+ * Career-framework level parsing and mapping to Udemy instructional levels.
+ *
+ * Invariant: mappings are explicit and ordered to keep search URL construction
+ * deterministic for the same normalized keyword input.
+ */
 import { InstructionalLevel } from '../udemy/navigation.js';
 
 export type CareerLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'D1' | 'D2' | 'D3' | 'E1' | 'E2';

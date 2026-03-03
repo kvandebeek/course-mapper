@@ -1,3 +1,7 @@
+/**
+ * Helpers for parsing normalized framework level codes and deriving combined
+ * allowed Udemy instructional levels.
+ */
 import { CourseInstructionalLevel, CareerLevel, LEVEL_TO_INSTRUCTIONAL, parseCareerLevel } from './careerLevel.js';
 
 export type FrameworkLevelCode = CareerLevel;

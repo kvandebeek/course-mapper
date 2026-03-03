@@ -1,8 +1,11 @@
 /**
- * src/searchScraper.ts
+ * API-first search page scraper with DOM fallback.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * Responsibilities:
+ * - Navigate keyword result pages with retries and jittered backoff.
+ * - Capture network responses that look like search result payloads.
+ * - Fallback to DOM extraction when payload capture fails.
+ * - Emit debug artifacts (screenshots + traces) for failed attempts.
  */
 
 import * as fs from 'node:fs/promises';
