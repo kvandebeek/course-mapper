@@ -19,13 +19,14 @@ test('parseLevelCode returns null for invalid levels', () => {
 test('framework mapping table has expected representative values', () => {
   assert.deepEqual(FRAMEWORK_TO_INSTRUCTIONAL_LEVELS.A1, ['beginner']);
   assert.deepEqual(FRAMEWORK_TO_INSTRUCTIONAL_LEVELS.B1, ['beginner', 'intermediate']);
-  assert.deepEqual(FRAMEWORK_TO_INSTRUCTIONAL_LEVELS.C1, ['intermediate', 'expert']);
+  assert.deepEqual(FRAMEWORK_TO_INSTRUCTIONAL_LEVELS.C1, ['intermediate']);
   assert.deepEqual(FRAMEWORK_TO_INSTRUCTIONAL_LEVELS.D1, ['expert']);
+  assert.deepEqual(FRAMEWORK_TO_INSTRUCTIONAL_LEVELS.D3, ['expert']);
   assert.deepEqual(FRAMEWORK_TO_INSTRUCTIONAL_LEVELS.E2, ['expert']);
 });
 
 test('allowed level union keeps stable ordering', () => {
   assert.deepEqual(getAllowedInstructionalLevels(['B1']), ['beginner', 'intermediate']);
-  assert.deepEqual(getAllowedInstructionalLevels(['C1']), ['intermediate', 'expert']);
-  assert.deepEqual(getAllowedInstructionalLevels(['B1', 'C1']), ['beginner', 'intermediate', 'expert']);
+  assert.deepEqual(getAllowedInstructionalLevels(['C1']), ['intermediate']);
+  assert.deepEqual(getAllowedInstructionalLevels(['B1', 'C2']), ['beginner', 'intermediate', 'expert']);
 });

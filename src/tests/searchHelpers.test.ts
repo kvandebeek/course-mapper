@@ -17,12 +17,12 @@ test('shouldStopPagination stops when unique total does not increase', () => {
   assert.equal(shouldStopPagination(27, 30), false);
 });
 
-test('sleepWithJitter waits at least base + jitterMin', async () => {
+test('sleepWithJitter uses deterministic midpoint delay', async () => {
   const start = performance.now();
   await sleepWithJitter(5, 10, 20);
   const elapsed = performance.now() - start;
-  assert.ok(elapsed >= 12);
-  assert.ok(elapsed < 80);
+  assert.ok(elapsed >= 18);
+  assert.ok(elapsed < 70);
 });
 
 test('search url heuristics exclude known non-result endpoints', () => {
