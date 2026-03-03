@@ -1,4 +1,3 @@
-import { mapUdemyInstructionalLevel } from '../udemy/instructionalLevel.js';
 import { ExportRow, KeywordRow } from '../types.js';
 import { CourseDetail } from '../udemy/extractCourseDetail.js';
 
@@ -16,7 +15,7 @@ export function buildExportRow(keywordRow: KeywordRow, course: CourseDetail): Ex
     level: keywordRow.level,
     moduleType: keywordRow.moduleType,
     keyword: keywordRow.keyword,
-    courseInstructionalLevel: mapUdemyInstructionalLevel(course.udemyLevel ?? '') ?? 'all',
+    courseInstructionalLevel: 'all',
     courseTitle: course.title,
     courseUrl: course.url,
     rating: course.rating ?? 0,

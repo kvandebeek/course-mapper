@@ -20,7 +20,6 @@ test('buildExportRow preserves track from keyword row', () => {
     url: 'https://resillion.udemy.com/course/aws-ai-practitioner-certified/',
     rating: 4.7,
     ratingCount: 39748,
-    udemyLevel: null,
     durationHours: 10,
     durationMinutes: 0,
     durationTotalMinutes: 600,
@@ -33,6 +32,7 @@ test('buildExportRow preserves track from keyword row', () => {
   assert.equal(row.level, 'A1 Intern');
   assert.equal(row.moduleType, 'ai');
   assert.equal(row.keyword, 'AI-Assisted Documentation');
+  assert.equal(row.courseInstructionalLevel, 'all');
 });
 
 
@@ -52,7 +52,6 @@ test('buildExportRow throws if track is blank', () => {
     url: 'https://resillion.udemy.com/course/x/',
     rating: 4.9,
     ratingCount: 2000,
-    udemyLevel: 'Beginner Level',
     durationHours: null,
     durationMinutes: null,
     durationTotalMinutes: null,

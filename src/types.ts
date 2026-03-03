@@ -68,7 +68,6 @@ export interface CourseRaw {
   title: string;
   language: string;
   durationMinutes: number | null;
-  udemyLevel: string | null;
   category: string | null;
   rating: number | null;
   ratingCount: number | null;
@@ -90,5 +89,4 @@ export interface SearchResultPayload {
   locale: string;
   rating: number | null;
   ratingCount: number | null;
-  level: string | null;
 }
