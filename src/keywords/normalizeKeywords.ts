@@ -2,10 +2,15 @@
  * Source keyword CSV normalization.
  *
  * Responsibilities:
- * - Parse `keywords-list.csv` shape used by the career framework.
- * - Split multi-value keyword cells into one row per keyword/module type.
- * - Normalize level labels into canonical level codes and deterministic ordering.
- * - Persist `artifacts/keywords.normalized.csv` used by the scraper runtime.
+ * - Parse the career-framework input CSV shape (`Track`,`Level`,`Core Modules`,`AI Modules`,`Softskills`).
+ * - Split module cells into individual keyword rows and carry forward track/level context.
+ * - Compute per-keyword `levelCodes` union to support instructional-level mapping later.
+ * - Persist deterministic normalized output consumed by the runtime scraper.
+ *
+ * Important assumptions:
+ * - Empty Track cells inherit the most recent non-empty Track value.
+ * - Module cells are comma-separated lists.
+ * - Header aliases are normalized so minor casing/spacing differences are tolerated.
  */
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';

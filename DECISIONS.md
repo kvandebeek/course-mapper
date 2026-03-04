@@ -1,88 +1,177 @@
-# Engineering Decisions Log
+# Course Mapper Decision Record
 
-This document captures architecture and behavior decisions inferred from the current implementation.
+## ADR-001: Pipeline architecture is search -> inspect -> filter -> output
 
-## Architecture overview
+**Decision**
+- The runtime keeps a linear pipeline: normalize keywords, search per keyword/level, inspect details, apply filters/scoring, then write outputs.
 
-- The runtime entrypoint is `src/cli.ts`, which orchestrates normalization, session bootstrap, keyword iteration, scraping, filtering, and CSV writing.
-- Keyword preparation is split into:
-  - source normalization (`src/keywords/normalizeKeywords.ts`),
-  - freshness/regen checks (`src/keywords/ensureNormalizedKeywords.ts`),
-  - normalized loading (`src/keywords/loadNormalizedKeywords.ts`).
-- Scraping uses two paths:
-  - main production path: `src/udemy/scrapeKeyword.ts` + `src/udemy/extractCourseDetail.ts`,
-  - API-first search helper path: `src/searchScraper.ts` (used for reusable extraction helpers and diagnostics).
-- Output is separated into:
-  - shortlist export: `artifacts/udemy/top_courses.csv` (incremental append writer),
-  - trace/audit export: `artifacts/udemy/all_courses.csv`.
+**Context**
+- The tool must map framework keywords to courses while preserving traceability and handling unstable web responses.
 
-## Scraping strategy
+**Options considered**
+1. Single-stage search-only extraction without detail inspection.
+2. Multi-stage pipeline with explicit detail inspection and decision points.
 
-- Search runs are performed per keyword and per allowed instructional level.
-- Search URLs are built with explicit filters (`lang`, `duration`, `instructional_level`, `sort`).
-- Candidate discovery is URL-based (`/course/` links), canonicalized and deduplicated by full URL without query/hash.
-- Candidate detail extraction is done on detail pages and merged with eligibility/ranking outcomes.
+**Outcome**
+- Adopted multi-stage pipeline implemented via `src/cli.ts` + `src/udemy/scrapeKeyword.ts` + `src/udemy/extractCourseDetail.ts`.
 
-## Throttling and anti-blocking strategy
+**Consequences**
+- Better explainability and richer fields (duration/rating counts).
+- Higher runtime cost due to detail page visits.
 
-- Navigation and load-more interactions use jittered sleep + bounded retry behavior (`throttled`, `gotoWithRetries`).
-- Rate-limit and anti-bot indicators (403/429/"forbidden" variants) trigger backoff.
-- Search-unavailable pages are retried with exponential delay.
-- Diagnostic artifacts are written for navigation/extraction failures under `artifacts/nav_failures` and `artifacts/debug`.
+---
 
-## Filtering philosophy
+## ADR-002: Filtering policy uses hard gates with explicit reason codes
 
-- Filtering is intentionally strict and explicit:
-  - blocked-title keyword list excludes known out-of-scope content,
-  - minimum rating threshold,
-  - minimum rating-count threshold.
-- Rejections are logged with stable machine-readable reasons where possible (`blocked_keyword`, `rating_below_min`, `rating_count_below_min`, etc.).
-- Instructional level constraints are primarily enforced at search URL stage and carried forward via keyword-level mapping.
+**Decision**
+- Apply strict gates for blocked title keywords, rating threshold, and rating-count threshold before acceptance.
 
-## CSV schema decisions
+**Context**
+- Business users need confidence and easy explanation for why courses were rejected.
 
-- `top_courses.csv` contains the final shortlist columns required by the downstream mapping process.
-- `all_courses.csv` contains trace rows for inspected/accepted/rejected course states.
-- Incremental writing is used for both robustness and partial-run visibility.
+**Options considered**
+1. Soft scoring only (no hard rejects).
+2. Hard gate first, score only remaining candidates.
 
-## Traceability decisions
+**Outcome**
+- Hard-gate-first policy is implemented.
+- Current thresholds in `computeEligibility`: `rating >= 4.6`, `ratingCount >= 1000`.
+- Blocked keywords are case-insensitive normalized substring checks.
 
-- Every keyword run emits start/end logs.
-- Every inspected candidate can emit an audit row with status + failure reason.
-- Per-run `runId` is included in all-courses audit output to correlate results with a specific execution.
+**Consequences**
+- Predictable quality floor.
+- Potentially fewer accepted courses for niche keywords.
 
-## Intentional field minimization
+---
 
-- The shortlist export keeps a compact set of fields (track/level/moduleType/keyword/instructional-level/title/url/rating/ratingCount/duration).
-- Non-essential scraping fields are intentionally kept out of shortlist output and, when needed, are instead available in logs/artifacts.
+## ADR-003: Career level to instructional level mapping is explicit and fixed
 
-## Determinism strategy
+**Decision**
+- Keep a static mapping from framework levels to allowed Udemy instructional levels.
 
-- Determinism relies on:
-  - normalized keyword CSV generation with stable ordering,
-  - deterministic URL canonicalization and dedupe,
-  - ordered instructional-level mapping,
-  - serialized CSV writes per file path.
-- Timing randomness (jitter) affects runtime duration, not schema or filtering rules.
+**Context**
+- Framework levels and instructional levels use different taxonomies.
 
-## Observability and logging strategy
+**Options considered**
+1. Dynamic mapping via heuristics from titles/descriptions.
+2. Static mapping table maintained in code.
 
-- Logs are structured as timestamped level-tagged lines with optional JSON metadata.
-- Throttle/backoff/sleep events are explicitly logged via utility wrappers.
-- Rejection reasons are logged at filtering decision points.
-- Failure diagnostics include screenshots, traces, HTML dumps, and href dumps where applicable.
+**Outcome**
+- Static mapping in `LEVEL_TO_INSTRUCTIONAL` is used and searched per-level pass.
 
-## 2026-03-03 — Newly inferred/confirmed implementation decisions
+**Consequences**
+- Transparent behavior and deterministic URLs.
+- Mapping updates require code change.
 
-- `--concurrency` is intentionally accepted but runtime behavior is effectively sequential (`1`) for stability.
-- `--durations` defaults to `extraShort,short,medium,long` when omitted.
-- Normalized keyword artifacts are regenerated only when missing or older than source keyword CSV.
-- `all_courses.csv` supports optional per-run dedupe (`none` or `perRun`) keyed by `keyword|courseUrl|status`.
+---
 
-## Open issues / Follow-ups
+## ADR-004: Data retention keeps shortlist per run and audit history across runs
 
-1. **CLI/help mismatch risk:** CLI help suggests user-provided `--concurrency` is meaningful, but parser pins it to `1`.
-2. **Output schema wording drift risk:** documentation in older revisions may describe “minimal five-column output,” while current export includes additional course detail columns.
-3. **Tenant configurability gap:** base URL and org home path are hardcoded in app config rather than fully externalized.
-4. **Artifact retention policy gap:** debug/nav-failure artifacts are written but lifecycle/cleanup policy is not encoded in tooling.
-5. **Potential duplicate warning logs:** warning status logging in API candidate inspection appears to emit duplicate lines for a single event in `searchScraper`.
+**Decision**
+- `top_courses.csv` is regenerated per run; `all_courses.csv` is append-oriented history.
+
+**Context**
+- Consumers need both current shortlist and historical inspection evidence.
+
+**Options considered**
+1. Recreate all outputs each run.
+2. Keep shortlist fresh but preserve inspection history.
+
+**Outcome**
+- Adopted option 2.
+- Audit writer also supports `_v2` fallback when existing headers are incompatible.
+
+**Consequences**
+- Enables trend review and manual retrospective curation.
+- Historical file size growth must be managed operationally.
+
+---
+
+## ADR-005: Instructional level is taken from search context, not detail parsing
+
+**Decision**
+- Output `courseInstructionalLevel` from the instructional-level search pass context.
+
+**Context**
+- Detail extraction currently targets title/rating/ratingCount/duration and does not parse a canonical instructional-level field.
+
+**Options considered**
+1. Infer instructional level from detail page text.
+2. Use known search filter context that produced candidate.
+
+**Outcome**
+- Search-context value is used in exports and audit rows.
+
+**Consequences**
+- Stable and deterministic value assignment.
+- May differ from course marketing labels not represented in search filter taxonomy.
+
+---
+
+## ADR-006: Throttling/backoff policy is centralized and jittered
+
+**Decision**
+- Wrap sensitive operations in `throttled()` with jitter and bounded retries/backoff.
+
+**Context**
+- Udemy organization pages can intermittently return 403/429 or transient anti-bot states.
+
+**Options considered**
+1. Fixed sleeps only.
+2. Retry with jitter/backoff and rate-limit signal detection.
+
+**Outcome**
+- Centralized throttling policy implemented with defaults:
+  - max attempts: 3
+  - jitter ratio: 0.15
+  - backoff base: 25ms
+  - backoff max: 200ms
+- Search-unavailable pages additionally use exponential retry in search flow.
+
+**Consequences**
+- Improved reliability.
+- Runtime duration variance due to jitter/retries.
+
+---
+
+## ADR-007: Playwright reliability uses persistent desktop context + same-tab enforcement
+
+**Decision**
+- Use persistent browser context with fixed desktop viewport and enforce single-tab flow.
+
+**Context**
+- SSO and session reuse are required for non-interactive runs; popup behavior can destabilize extraction.
+
+**Options considered**
+1. Fresh ephemeral context every run.
+2. Persistent profile and single-tab guardrails.
+
+**Outcome**
+- Persistent profile directory is used; popups/new pages are closed.
+- Default viewport is desktop (`1440x900`).
+
+**Consequences**
+- Better session continuity and reproducibility.
+- Requires first headed run for SSO bootstrap when profile is empty.
+
+---
+
+## ADR-008: Determinism favors ordered normalization and serialized writes
+
+**Decision**
+- Keep deterministic ordering where possible and serialize output writes per file.
+
+**Context**
+- Consumers compare outputs across runs and need stable structure.
+
+**Options considered**
+1. Max throughput with unconstrained async writes.
+2. Ordered normalization + queued appends.
+
+**Outcome**
+- Deterministic normalization sort order and per-file append queues are implemented.
+
+**Consequences**
+- Stronger reproducibility of file structure/order.
+- Throughput is intentionally lower than highly parallel alternatives.
+

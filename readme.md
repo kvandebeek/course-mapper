@@ -1,200 +1,151 @@
-# Course Mapper (Udemy Business Scraper)
+# Course Mapper (Technical README)
 
-Course Mapper is a TypeScript CLI that links career-framework keywords to Udemy Business courses, filters results using explicit quality gates, and exports traceable CSV artifacts.
+Course Mapper is a TypeScript CLI that maps career-framework keywords to Udemy Business courses. It automates keyword normalization, Udemy search navigation, course detail extraction, filtering, scoring, and CSV export so teams can run a repeatable pipeline instead of manual searching.
 
-## Technical Guide
+The runtime is intentionally conservative: one keyword at a time, explicit rejection reasons, and incremental CSV writes for traceability. Accepted courses are exported to `top_courses.csv`, while all inspected outcomes are appended to `all_courses.csv` for audit and future review.
 
-### 1) Setup
+## Prerequisites
 
-- Node.js `>= 20.11.0`
+- Node.js `>=20.11.0` (from `package.json` engines)
 - npm
-- A Udemy Business tenant account with organization access
-- First run should be headed (`--headless=false`) so SSO can be completed and stored in the profile directory
+- A Udemy Business org account (this repo defaults to `https://resillion.udemy.com`)
+- Playwright browser binaries installed via dependency install (`playwright` package)
+- First login should generally be headed (`--headless=false`) to complete SSO and persist profile state
 
-### 2) Installation
+## Install
 
 ```bash
 npm install
 ```
 
-### 3) CLI usage
+## Main commands
 
 ```bash
-# Show help
-npm run scrape -- --help
-
-# Typical scrape run (sequential, throttled)
+# Run scraper
 npm run scrape -- --headless=true --browserChannel=chrome --throttleMs=900 --maxPages=8
 
-# First-run login bootstrap (manual SSO in browser)
+# First-time SSO bootstrap (headed)
 npm run scrape -- --headless=false --profileDir=./artifacts/profile --browserChannel=chrome
 
 # Normalize keywords only
 npm run normalize:keywords
 
-# Type check / tests
+# Typecheck and tests
 npm run typecheck
 npm test
 ```
 
-### 4) Configuration and flags
-
-Supported runtime flags:
+## CLI flags
 
 - `--headless=true|false`
 - `--debug=true|false`
 - `--browserChannel=chrome|msedge|chromium`
-- `--maxCoursesPerKeyword=<number>`
+- `--maxCoursesPerKeyword=<number>` (runtime hard cap also enforces max 200)
 - `--maxPages=<number>`
 - `--throttleMs=<number>`
-- `--concurrency=<number>` *(currently parsed but effectively forced to sequential behavior)*
+- `--concurrency=<number>` (currently parsed but forced to sequential behavior)
 - `--profileDir=<path>`
-- `--keywordsFile=<path>`
-- `--normalizedKeywordsFile=<path>`
-- `--durations=<comma-separated buckets>` where buckets are `extraShort,short,medium,long,extraLong`
+- `--keywordsFile=<path>` (default source: `./keywords-list.csv`)
+- `--normalizedKeywordsFile=<path>` (default normalized artifact: `./artifacts/keywords.normalized.csv`)
+- `--durations=<comma-separated>` where each value is one of `extraShort,short,medium,long,extraLong`
 - `--allCoursesDedupe=none|perRun`
 
-App defaults (from config):
+## Input configuration
 
-- base URL: `https://resillion.udemy.com`
-- org home path: `/organization/home/`
-- default thresholds: min rating `4.6`, min rating count `5000`
-- default duration filters: `extraShort,short,medium,long`
+### Source keyword CSV
+Default file: `keywords-list.csv` (overridable via `--keywordsFile`)
 
-### 5) Inputs
-
-Primary source CSV (default `keywords-list.csv`) uses headers:
+Expected columns:
 
 ```csv
 Track,Level,Core Modules,AI Modules,Softskills
 ```
 
-Normalized artifact (default `artifacts/keywords.normalized.csv`) uses:
+Behavior:
+- `Core Modules`, `AI Modules`, `Softskills` are split by comma into individual keywords.
+- Empty `Track` cells inherit the previous non-empty track.
+- Header aliases are normalized (minor casing/spacing variation tolerated).
+- Output is deduplicated and sorted deterministically.
+
+### Normalized keyword CSV
+Generated/read at `artifacts/keywords.normalized.csv` by default:
 
 ```csv
 track,level,levelCodes,moduleType,keyword
 ```
 
-### 6) Outputs
+## Search/filter behavior
 
-#### `artifacts/udemy/top_courses.csv`
+- Base URL: `https://resillion.udemy.com/organization/search/`
+- Query params include keyword plus filters such as `ratings`, `lang`, `duration`, `instructional_level`, `sort`.
+- Default search filters in runtime:
+  - min rating param: `4.6`
+  - language: `en`
+  - durations: `extraShort,short,medium,long`
+  - sort: `relevance`
+- Career-level to instructional-level mapping:
+  - A1/A2 -> beginner
+  - B1 -> beginner, intermediate
+  - B2/C1 -> intermediate
+  - C2 -> intermediate, expert
+  - D1/D2/D3/E1/E2 -> expert
+- Blocked title keywords are matched case-insensitively via normalized substring matching.
+- Acceptance gates after detail extraction:
+  - `rating >= 4.6`
+  - `ratingCount >= 1000`
 
-Final shortlisted courses:
+## Outputs
 
-- `track`
-- `level`
-- `moduleType`
-- `keyword`
-- `courseInstructionalLevel`
-- `courseTitle`
-- `courseUrl`
-- `rating`
-- `ratingCount`
-- `duration`
-- `durationTotalMinutes`
+### `artifacts/udemy/top_courses.csv`
+- Recreated each run.
+- Incrementally appended while processing accepted courses.
+- Columns (stable order):
+  - `track`
+  - `level`
+  - `moduleType`
+  - `keyword`
+  - `courseInstructionalLevel`
+  - `courseTitle`
+  - `courseUrl`
+  - `rating`
+  - `ratingCount`
+  - `duration`
+  - `durationTotalMinutes`
 
-#### `artifacts/udemy/all_courses.csv`
+### `artifacts/udemy/all_courses.csv`
+- Append-oriented audit/history file.
+- Records inspected, accepted, and rejected outcomes.
+- If an existing file has a header mismatch, writer creates `all_courses_v2.csv`.
+- Columns:
+  - `timeAdded`
+  - `keyword`
+  - `courseTitle`
+  - `courseUrl`
+  - `rating`
+  - `ratingCount`
+  - `courseInstructionalLevel`
+  - `durationMinutes`
+  - `lastUpdated`
+  - `status` (`inspected|accepted|rejected`)
+  - `failureReason`
 
-Audit/trace log of inspected outcomes:
+## Determinism and reliability notes
 
-- `runId`
-- `keyword`
-- `courseTitle`
-- `courseUrl`
-- `rating`
-- `ratingCount`
-- `courseInstructionalLevel`
-- `durationMinutes`
-- `lastUpdated`
-- `status` (`inspected|accepted|rejected`)
-- `failureReason`
+- Runtime is sequential for stability.
+- URL canonicalization strips query/hash before dedupe.
+- Incremental writers serialize appends per file to avoid line interleaving.
+- Playwright session uses persistent context/profile and same-tab enforcement (popups/new tabs are closed).
+- Throttle wrapper applies jitter and bounded retry/backoff for rate-limit-like failures (403/429/etc).
 
-### 7) Folder structure
+## Common failure modes and troubleshooting
 
-- `src/cli.ts` — main orchestration
-- `src/config.ts` — CLI parsing + defaults
-- `src/keywords/*` — keyword normalization/loading
-- `src/levels/*` — career-level to instructional-level mappings
-- `src/udemy/*` — navigation, search, detail extraction, keyword scrape pipeline
-- `src/io/*` and `src/output/*` — incremental/audit CSV writers
-- `src/results/*` — export row shaping
-- `src/runtime/*` — Playwright session/context management
-- `src/utils/*` — retry/throttle/time helpers
-- `artifacts/` — runtime outputs, debug files, profile persistence
+- **Not authenticated in headless mode**
+  - Run once with `--headless=false`, complete SSO, then rerun headless.
+- **Search page unavailable/transient anti-bot behavior**
+  - Increase `--throttleMs`, reduce `--maxPages`, retry run.
+- **No search results found for keyword**
+  - Check keyword quality and blocked-title policy overlap.
+  - Inspect artifacts in `artifacts/nav_failures` and `artifacts/debug`.
+- **Audit CSV schema changed from prior run format**
+  - Writer automatically switches to `_v2`; consume newest file path from logs.
 
-### 8) Pipeline flow (high-level)
-
-1. Parse CLI and load app defaults.
-2. Ensure normalized keyword file exists and is fresh.
-3. Start/reuse persistent browser session and verify authentication.
-4. For each normalized keyword:
-   - derive allowed instructional levels from career level,
-   - run keyword searches (per instructional level),
-   - collect candidate course URLs,
-   - open course detail pages and extract fields,
-   - apply filters (blocked keyword, rating, rating count),
-   - score and rank accepted candidates,
-   - append shortlist/audit rows incrementally.
-5. Close writers/session and emit run summary logs.
-
-### 9) Operational notes
-
-- If headless auth fails, rerun with `--headless=false` and complete SSO.
-- Throttling and backoff are intentional for anti-blocking stability.
-- Debug artifacts are emitted on failures under `artifacts/debug` and `artifacts/nav_failures`.
-
----
-
-## For HR, Sales, and Management
-
-This tool helps turn your career framework into a practical course shortlist.
-
-### What it does
-
-It reads your role/level keywords, searches Udemy Business for matching courses, removes weak or off-topic results, and creates a clean shortlist plus a trace file that explains what was accepted or rejected.
-
-### Why it exists
-
-Manually searching courses for every role and level is slow and inconsistent. This tool makes the process faster, repeatable, and easier to audit.
-
-### Problem it solves
-
-It closes the gap between:
-
-- a career framework (roles, levels, modules), and
-- concrete learning content teams can assign and review.
-
-### How it connects courses to the career framework
-
-- Input keywords come from your career framework structure.
-- Each keyword is linked to a track, level, and module type.
-- The system searches and filters courses for that exact context.
-- Output rows keep that mapping so every course is traceable back to framework intent.
-
-### How this supports each function
-
-- **HR:** supports clearer career progression alignment by level and module type.
-- **Sales:** improves visibility of capability-building content tied to role expectations.
-- **Management:** supports planning and gap analysis with a consistent shortlist process.
-
-### Inputs, processing, outputs
-
-- **Inputs:** career-framework keywords from CSV.
-- **Processing:** search, filtering, level mapping, and ranking.
-- **Outputs:** shortlisted courses and a full inspected-course audit trail.
-
-### How to interpret results
-
-- The shortlist is a high-confidence starting point, not a final approval list.
-- Use audit output to understand rejections and tune keywords when needed.
-
-### Recommended run frequency
-
-- Run on a regular cadence (for example monthly or each curriculum planning cycle).
-- Re-run after major framework updates or when launching new skill tracks.
-
-### What it does NOT do
-
-- It does not replace human curriculum judgment.
-- It does not guarantee business fit for every accepted course.
-- It does not automatically assign courses to learners.

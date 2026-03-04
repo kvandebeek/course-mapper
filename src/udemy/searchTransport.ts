@@ -1,8 +1,10 @@
 /**
- * src/udemy/searchTransport.ts
+ * Network-transport helpers for search-result capture.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * This module is intentionally defensive because Udemy API endpoints and response
+ * shapes can vary by tenant/runtime. It therefore sniffs candidate endpoints,
+ * checks payload shape heuristically, and exposes safe helpers that degrade to
+ * `undefined`/`null` instead of throwing.
  */
 
 import { Page, Response } from 'playwright';

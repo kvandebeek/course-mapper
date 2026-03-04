@@ -1,8 +1,17 @@
 /**
- * src/cli.ts
+ * Main runtime entrypoint for the production scraping pipeline.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * Pipeline responsibilities:
+ * 1) Parse CLI flags and resolve file paths.
+ * 2) Ensure normalized keyword input exists and is fresh.
+ * 3) Create/reuse an authenticated Playwright persistent session.
+ * 4) Process each normalized keyword row (search -> detail extraction -> filter -> score).
+ * 5) Stream accepted rows to `top_courses.csv` and all observed outcomes to `all_courses.csv`.
+ *
+ * Operational invariants:
+ * - Runtime is intentionally sequential for stability (`--concurrency` is parsed but pinned to 1).
+ * - `top_courses.csv` is recreated per run, while `all_courses.csv` is append-oriented audit history.
+ * - Per-keyword failures are isolated and do not fail the full run.
  */
 
 import { rm } from 'node:fs/promises';
@@ -21,7 +30,7 @@ import { buildExportRow } from './results/buildExportRow.js';
 import { parseCareerLevel, LEVEL_TO_INSTRUCTIONAL } from './levels/careerLevel.js';
 
 /**
- * printHelp: internal utility for this module.
+ * Prints supported CLI flags.
  */
 function printHelp(): void {
   console.log(`Udemy Business scraper options:
@@ -40,7 +49,7 @@ function printHelp(): void {
 }
 
 /**
- * main: internal utility for this module.
+ * Orchestrates one end-to-end scrape run.
  */
 async function main(): Promise<void> {
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
