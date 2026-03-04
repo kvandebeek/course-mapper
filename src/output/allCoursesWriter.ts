@@ -1,9 +1,12 @@
 /**
  * Audit CSV writer for every inspected course candidate.
  *
- * This writer keeps a traceable stream of `inspected` / `accepted` / `rejected`
- * outcomes per keyword so reviewers can explain why shortlist rows were kept or
- * filtered out. Optional per-run dedupe suppresses duplicate status rows.
+ * Data-retention behavior:
+ * - Appends to an existing audit file across runs (history is preserved).
+ * - If an existing file header is incompatible, writes to a `_v2` sibling file to
+ *   avoid corrupting prior historical data.
+ * - Optional `perRun` dedupe suppresses duplicate `keyword|courseUrl|status` rows
+ *   within one execution, but never removes historical rows from previous runs.
  */
 import { appendFile, mkdir, readFile, stat } from 'node:fs/promises';
 import * as path from 'node:path';

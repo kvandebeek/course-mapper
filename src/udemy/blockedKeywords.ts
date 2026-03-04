@@ -1,3 +1,13 @@
+/**
+ * Case-insensitive title blocking policy.
+ *
+ * Notes:
+ * - Matching uses normalized lowercase substring checks (not tokenized whole-word matching).
+ * - The list intentionally contains business-policy exclusions and can include duplicates;
+ *   duplicates do not change runtime behavior because matching short-circuits on first hit.
+ * - This policy is applied in both API-based and DOM-based search extraction paths, and
+ *   again after detail extraction as a defensive final gate.
+ */
 import { normalizeForMatch } from '../utils/textNormalize.js';
 
 export const DISALLOWED_TITLE_KEYWORDS = [

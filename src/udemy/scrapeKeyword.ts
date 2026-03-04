@@ -442,8 +442,10 @@ export type Eligibility = Readonly<{
 /**
  * Computes hard eligibility gates applied before ranking.
  *
- * A course is accepted only when both rating and rating count meet thresholds;
- * otherwise an explicit rejection reason is returned for audit logging.
+ * Invariants:
+ * - Thresholds are fixed in this module (`rating >= 4.6`, `ratingCount >= 1000`).
+ * - Missing values are treated as `0` and therefore rejected.
+ * - Rejection reason values are stable because they are written to audit CSV.
  */
 export function computeEligibility(
   input: Readonly<{

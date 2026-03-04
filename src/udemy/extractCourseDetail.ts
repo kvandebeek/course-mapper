@@ -1,8 +1,11 @@
 /**
- * src/udemy/extractCourseDetail.ts
+ * Course detail extraction from Udemy course pages.
  *
- * Purpose: documents the responsibilities of this module so new contributors can
- * quickly understand where it sits in the scraping pipeline.
+ * Extraction strategy:
+ * - Prefer structured payloads embedded in page scripts (`window.UD` and JSON-LD).
+ * - Parse visible "total length" text for duration normalization.
+ * - Return diagnostic metadata instead of throwing when payloads are missing, so the
+ *   caller can record explicit rejection/failure reasons in the audit log.
  */
 
 import { Page } from 'playwright';
