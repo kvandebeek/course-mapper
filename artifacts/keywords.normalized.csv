@@ -1,229 +1,177 @@
 track,level,levelCodes,moduleType,keyword
-Pathfinding,A1 Intern,A1,ai,AI Awareness in Testing
-Pathfinding,A1 Intern,A1,ai,AI For Beginners
-Pathfinding,A1 Intern,A1,ai,AI For Testers
-Pathfinding,A1 Intern,A1,ai,AI For Typescript
-Pathfinding,A1 Intern,A1,ai,Copilot
-Pathfinding,A1 Intern,A1,ai,AI Testing
-Pathfinding,A1 Intern,A1,ai,GenAI for TestCases
-Pathfinding,A1 Intern,A1,ai,AI TestCases
-Pathfinding,A1 Intern,A1,ai,Generative AI for TestCases
-Pathfinding,A1 Intern,A1,ai,Prompt Writing Fundamentals
-Pathfinding,A1 Intern,A1,ai,Responsible AI Basics
-Pathfinding,A1 Intern,A1,core,Basic Programming Concepts
-Pathfinding,A1 Intern,A1,core,Git & Version Control
-Pathfinding,A1 Intern,A1,core,SDLC Basics
-Pathfinding,A1 Intern,A1,core,Test Documentation Essentials
-Pathfinding,A1 Intern,A1,core,Test Documentation
-Pathfinding,A1 Intern,A1,core,QA Documentation
-Pathfinding,A1 Intern,A1,core,QA Basics
-Pathfinding,A1 Intern,A1,core,QA Fundamentals
-Pathfinding,A1 Intern,A1,core,Testing Fundamentals
-Pathfinding,A1 Intern,A1,softskills,Active Listening
-Pathfinding,A1 Intern,A1,softskills,Collaboration Basics
-Pathfinding,A1 Intern,A1,softskills,Feedback Openness
-Pathfinding,A1 Intern,A1,softskills,Growth Mindset
-Pathfinding,A1 Intern,A1,softskills,Personal Accountability
-Pathfinding,A1 Intern,A1,softskills,Professional Communication Foundations
-Pathfinding,A2 Graduate,A2,ai,AI Log Analysis
-Pathfinding,A2 Graduate,A2,ai,AI Analysis
-Pathfinding,A2 Graduate,A2,ai,AI-Assisted Documentation
-Pathfinding,A2 Graduate,A2,ai,AI-Augmented Test Design
-Pathfinding,A2 Graduate,A2,ai,AI Test Design
-Pathfinding,A2 Graduate,A2,ai,AI Testing Design
-Pathfinding,A2 Graduate,A2,ai,GenAI for API Testing
-Pathfinding,A2 Graduate,A2,core,CI/CD Foundations
-Pathfinding,A2 Graduate,A2,core,Cloud Basics for Testers
-Pathfinding,A2 Graduate,A2,core,Functional & API Testing
-Pathfinding,A2 Graduate,A2,core,Intro Automation Frameworks
-Pathfinding,A2 Graduate,A2,core,Playwright
-Pathfinding,A2 Graduate,A2,core,Playwright Testing
-Pathfinding,A2 Graduate,A2,softskills,Adaptability
-Pathfinding,A2 Graduate,A2,softskills,Analytical Thinking
-Pathfinding,A2 Graduate,A2,softskills,Confidence in Stand-ups
-Pathfinding,A2 Graduate,A2,softskills,Stakeholder Awareness
-Pathfinding,A2 Graduate,A2,softskills,Team Collaboration
-Pathfinding,A2 Graduate,A2,softskills,Time Management
-Pathfinding,B1 Engineer,B1,ai,AI Performance Insights
-Pathfinding,B1 Engineer,B1,ai,AI-Assisted Automation Development
-Pathfinding,B1 Engineer,B1,ai,Intelligent Test Data Generation
-Pathfinding,B1 Engineer,B1,ai,ML Concepts for Testers
-Pathfinding,B1 Engineer,B1,core,API & Integration Testing
-Pathfinding,B1 Engineer,B1,core,Automation Engineering
-Pathfinding,B1 Engineer,B1,core,Cloud Test Execution
-Pathfinding,B1 Engineer,B1,core,Performance Foundations
-Pathfinding,B1 Engineer,B1,core,Test Data Engineering
-Pathfinding,B1 Engineer,B1,softskills,Client Professionalism
-Pathfinding,B1 Engineer,B1,softskills,Constructive Feedback
-Pathfinding,B1 Engineer,B1,softskills,Continuous Improvement
-Pathfinding,B1 Engineer,B1,softskills,Estimation & Planning
-Pathfinding,B1 Engineer,B1,softskills,Ownership Mindset
-Pathfinding,B1 Engineer,B1,softskills,Structured Communication
 Leadership,B2 Senior Engineer,B2,ai,AI Quality Dashboards
 Leadership,B2 Senior Engineer,B2,ai,AI Tool Evaluation
 Leadership,B2 Senior Engineer,B2,ai,AI-Enhanced Test Strategy
 Leadership,B2 Senior Engineer,B2,ai,Responsible AI Governance
-Leadership,B2 Senior Engineer,B2,core,Advanced Test Strategy
-Leadership,B2 Senior Engineer,B2,core,Framework Optimisation
-Leadership,B2 Senior Engineer,B2,core,Quality Engineering Practices
+Leadership,B2 Senior Engineer,B2,core,Advanced Frameworks
+Leadership,B2 Senior Engineer,B2,core,Reporting
 Leadership,B2 Senior Engineer,B2,core,Risk-Based Testing
+Leadership,B2 Senior Engineer,B2|C1|C2,core,Stakeholder Management
+Leadership,B2 Senior Engineer,B2,core,Test Strategy
 Leadership,B2 Senior Engineer,B2,softskills,Assertive Communication
 Leadership,B2 Senior Engineer,B2,softskills,Coaching & Mentoring
 Leadership,B2 Senior Engineer,B2,softskills,Facilitating Agile Ceremonies
 Leadership,B2 Senior Engineer,B2,softskills,Handling Difficult Conversations
 Leadership,B2 Senior Engineer,B2,softskills,Influencing Without Authority
 Leadership,B2 Senior Engineer,B2,softskills,Leading Work Packages
-Specialist,B2 Specialist,B2,ai,AI-Enhanced Framework Engineering
-Specialist,B2 Specialist,B2,ai,GenAI Workflow Integration
-Specialist,B2 Specialist,B2,ai,ML-Based Test Prioritization
-Specialist,B2 Specialist,B2,core,Advanced Programming & Design Patterns
-Specialist,B2 Specialist,B2,core,Domain Tool Mastery
-Specialist,B2 Specialist,B2,core,Framework Engineering
-Specialist,B2 Specialist,B2,core,Performance & Debugging Excellence
-Specialist,B2 Specialist,B2,softskills,Analytical Excellence
-Specialist,B2 Specialist,B2,softskills,Clear Technical Communication
-Specialist,B2 Specialist,B2,softskills,Continuous Learning
-Specialist,B2 Specialist,B2,softskills,Knowledge Sharing
-Specialist,B2 Specialist,B2,softskills,Ownership of Expertise
-Specialist,B2 Specialist,B2,softskills,Technical Advisory Skills
-Leadership,C1 Team Lead,C1,ai,AI Delivery Optimisation
-Leadership,C1 Team Lead,C1,ai,AI-Powered Reporting & Forecasting
-Leadership,C1 Team Lead,C1,ai,Ethical AI Leadership
-Leadership,C1 Team Lead,C1,core,Quality Standards Definition
-Leadership,C1 Team Lead,C1,core,Team Delivery Leadership
-Leadership,C1 Team Lead,C1,core,Technical Oversight
-Leadership,C1 Team Lead,C1,core,Test Planning & Governance
-Leadership,C1 Team Lead,C1,softskills,Conflict Resolution
-Leadership,C1 Team Lead,C1,softskills,Decision-Making
+Leadership,C1 Team Lead,C1,ai,AI Delivery Forecasting
+Leadership,C1 Team Lead,C1,ai,AI-Powered Reporting
+Leadership,C1 Team Lead,C1,ai,Ethical AI Governance
+Leadership,C1 Team Lead,C1,core,Conflict Management
+Leadership,C1 Team Lead,C1,core,Delivery Excellence
+Leadership,C1 Team Lead,C1,core,Leading QA Teams
+Leadership,C1 Team Lead,C1,core,Test Planning
 Leadership,C1 Team Lead,C1,softskills,Delegation
 Leadership,C1 Team Lead,C1,softskills,Emotional Intelligence
-Leadership,C1 Team Lead,C1,softskills,Talent Development
-Leadership,C1 Team Lead,C1,softskills,Team Motivation
-Specialist,C1 Senior Specialist,C1,ai,AI Performance Engineering
-Specialist,C1 Senior Specialist,C1,ai,AI-Native Automation Patterns
-Specialist,C1 Senior Specialist,C1,ai,AIOps Foundations
-Specialist,C1 Senior Specialist,C1,core,Advanced Architecture Review
-Specialist,C1 Senior Specialist,C1,core,Cloud-Native Automation
-Specialist,C1 Senior Specialist,C1,core,Security & Performance Engineering
-Specialist,C1 Senior Specialist,C1,core,TestOps Implementation
-Specialist,C1 Senior Specialist,C1,softskills,Community Contribution
-Specialist,C1 Senior Specialist,C1,softskills,Cross-Functional Influence
-Specialist,C1 Senior Specialist,C1,softskills,Documentation Excellence
-Specialist,C1 Senior Specialist,C1,softskills,Mentorship Through Expertise
-Specialist,C1 Senior Specialist,C1,softskills,Practice Collaboration
-Specialist,C1 Senior Specialist,C1,softskills,Technical Thought Leadership
-Leadership,C2 Associate Manager,C2,ai,AI Governance Implementation
-Leadership,C2 Associate Manager,C2,ai,AI Maturity Frameworks
+Leadership,C1 Team Lead,C1,softskills,Mediation
+Leadership,C1 Team Lead,C1,softskills,Running Effective Meetings
+Leadership,C1 Team Lead,B2|C1|C2,softskills,Stakeholder Management
+Leadership,C1 Team Lead,C1,softskills,Team Leadership & Motivation
+Leadership,C2 Associate Manager,C2,ai,AI Maturity Models
+Leadership,C2 Associate Manager,C2,ai,AI Quality Governance
 Leadership,C2 Associate Manager,C2,ai,AI Resource Planning
-Leadership,C2 Associate Manager,C2,core,Financial & Commercial Awareness
+Leadership,C2 Associate Manager,C2,core,Financial Awareness
 Leadership,C2 Associate Manager,C2,core,Multi-Team Coordination
-Leadership,C2 Associate Manager,C2,core,Portfolio Oversight
-Leadership,C2 Associate Manager,C2,core,Quality Maturity Models
-Leadership,C2 Associate Manager,C2,softskills,Change Management
+Leadership,C2 Associate Manager,C2,core,Quality Maturity
+Leadership,C2 Associate Manager,B2|C1|C2,core,Stakeholder Management
+Leadership,C2 Associate Manager,C2,softskills,Change Management Fundamentals
 Leadership,C2 Associate Manager,C2,softskills,Coaching for Performance
 Leadership,C2 Associate Manager,C2,softskills,Cross-Team Communication
-Leadership,C2 Associate Manager,C2,softskills,Managing Upwards
-Leadership,C2 Associate Manager,C2,softskills,Negotiation Skills
+Leadership,C2 Associate Manager,C2,softskills,Managing Up
+Leadership,C2 Associate Manager,C2|D1,softskills,Negotiation
 Leadership,C2 Associate Manager,C2,softskills,Strategic Thinking
-Specialist,C2 Principal Specialist,C2,ai,AI Quality Analytics Strategy
-Specialist,C2 Principal Specialist,C2,ai,AI Toolchain Architecture
-Specialist,C2 Principal Specialist,C2,ai,AI-Enhanced TestOps Pipelines
-Specialist,C2 Principal Specialist,C2,core,Domain Capability Leadership
-Specialist,C2 Principal Specialist,C2,core,Engineering Analytics
-Specialist,C2 Principal Specialist,C2,core,Enterprise Automation Architecture
-Specialist,C2 Principal Specialist,C2,core,Tooling Strategy & Governance
-Specialist,C2 Principal Specialist,C2,softskills,Advanced Negotiation
-Specialist,C2 Principal Specialist,C2,softskills,Advisory Communication
-Specialist,C2 Principal Specialist,C2,softskills,Capability Building
-Specialist,C2 Principal Specialist,C2,softskills,Industry Engagement
-Specialist,C2 Principal Specialist,C2,softskills,Practice Development
-Specialist,C2 Principal Specialist,C2,softskills,Strategic Influence Through Expertise
+Leadership,D1 Manager,D1,ai,AI Risk/Quality Prediction Models
 Leadership,D1 Manager,D1,ai,AI-First QE Strategy
-Leadership,D1 Manager,D1,ai,Predictive Quality & Risk Models
 Leadership,D1 Manager,D1,ai,Scaling AI Automation
-Leadership,D1 Manager,D1,core,Automation at Scale
-Leadership,D1 Manager,D1,core,Large-Scale Delivery Governance
-Leadership,D1 Manager,D1,core,QE Strategy Definition
-Leadership,D1 Manager,D1,core,Stakeholder & Client Management
-Leadership,D1 Manager,D1|D3,softskills,Executive Communication
+Leadership,D1 Manager,D1,core,Change Management
+Leadership,D1 Manager,C2|D1,core,Negotiation
+Leadership,D1 Manager,D1,core,QE Strategy
+Leadership,D1 Manager,D1,core,Scaling Automation
+Leadership,D1 Manager,D1,softskills,Building High-Performance Teams
+Leadership,D1 Manager,D1|D2,softskills,Executive Communication
 Leadership,D1 Manager,D1,softskills,High-Stakes Negotiation
 Leadership,D1 Manager,D1,softskills,Leading Through Change
 Leadership,D1 Manager,D1,softskills,Organizational Leadership
-Leadership,D1 Manager,D1,softskills,Performance Culture Building
 Leadership,D1 Manager,D1,softskills,Strategic Influence
-Leadership,D2 Senior Manager,D2,ai,AI Governance at Scale
-Leadership,D2 Senior Manager,D2,ai,AI-Driven Business Optimisation
-Leadership,D2 Senior Manager,D2,ai,Enterprise AI Adoption Strategy
-Leadership,D2 Senior Manager,D2,core,Business Unit Leadership
-Leadership,D2 Senior Manager,D2,core,Financial Accountability
-Leadership,D2 Senior Manager,D2,core,Operational Excellence
-Leadership,D2 Senior Manager,D2,core,Strategic Growth Execution
-Leadership,D2 Senior Manager,D2,softskills,Commercial Acumen
-Leadership,D2 Senior Manager,D2,softskills,Enterprise Stakeholder Management
+Leadership,D2 Senior Manager,D2,ai,AI Business Development
+Leadership,D2 Senior Manager,D2,ai,Enterprise AI Strategy
+Leadership,D2 Senior Manager,D2,ai,Executive AI Communication
+Leadership,D2 Senior Manager,D2,core,Enterprise Quality Architecture
+Leadership,D2 Senior Manager,D1|D2,core,Executive Communication
+Leadership,D2 Senior Manager,D2,core,High-Performance Organizations
+Leadership,D2 Senior Manager,D2,core,Innovation
 Leadership,D2 Senior Manager,D2,softskills,Executive Presence
-Leadership,D2 Senior Manager,D2,softskills,High-Performance Leadership
-Leadership,D2 Senior Manager,D2,softskills,Organizational Alignment
-Leadership,D2 Senior Manager,D2,softskills,Strategic Storytelling
+Leadership,D2 Senior Manager,D2,softskills,Innovation Leadership
+Leadership,D2 Senior Manager,D2,softskills,Vision & Storytelling
+Leadership,D2 Senior Manager,D2,softskills,� �Crisis Communication
+Leadership,D2 Senior Manager,D2,softskills,� �Enterprise Stakeholder Management
+Leadership,D2 Senior Manager,D2,softskills,� �Thought Leadership
+Pathfinding,A1 Intern,A1,ai,AI-Assisted Documentation
+Pathfinding,A1 Intern,A1,ai,GenAI for Test Case Drafting
+Pathfinding,A1 Intern,A1,ai,Intro to AI in Testing
+Pathfinding,A1 Intern,A1,ai,Prompt Engineering Basics
+Pathfinding,A1 Intern,A1,core,Exploratory Testing
+Pathfinding,A1 Intern,A1,core,Git
+Pathfinding,A1 Intern,A1,core,Intro Programming
+Pathfinding,A1 Intern,A1,core,Introduction to Testing
+Pathfinding,A1 Intern,A1,core,Pair Programming
+Pathfinding,A1 Intern,A1,core,Test Case Design
+Pathfinding,A1 Intern,A1,softskills,Active Listening
+Pathfinding,A1 Intern,A1,softskills,Basic Presentation Skills
+Pathfinding,A1 Intern,A1,softskills,Collaboration in Agile Teams
+Pathfinding,A1 Intern,A1,softskills,Growth Mindset
+Pathfinding,A1 Intern,A1,softskills,Professional Communication Basics
+Pathfinding,A1 Intern,A1,softskills,Time Management
+Pathfinding,A2 Graduate,A2,ai,AI for Exploratory Testing
+Pathfinding,A2 Graduate,A2,ai,AI Log/Pattern Analysis
+Pathfinding,A2 Graduate,A2,ai,AI-Augmented Test Design
+Pathfinding,A2 Graduate,A2,ai,GenAI for API Test Ideas
+Pathfinding,A2 Graduate,A2,core,API Testing
+Pathfinding,A2 Graduate,A2,core,CI/CD Basics
+Pathfinding,A2 Graduate,A2,core,Cloud Fundamentals
+Pathfinding,A2 Graduate,A2,core,Functional Testing Masterclass
+Pathfinding,A2 Graduate,A2,core,Intro Automation
+Pathfinding,A2 Graduate,A2,softskills,Confidence in Stand-ups
+Pathfinding,A2 Graduate,A2,softskills,Consultancy Mindset Intro
+Pathfinding,A2 Graduate,A2,softskills,Effective Written Communication
+Pathfinding,A2 Graduate,A2,softskills,Problem-Solving Fundamentals
+Pathfinding,A2 Graduate,A2,softskills,Stakeholder Awareness
+Pathfinding,A2 Graduate,A2,softskills,Team Collaboration
+Pathfinding,B1 Engineer,B1,ai,AI Performance Insights
+Pathfinding,B1 Engineer,B1,ai,AI-Assisted Automation Scripting
+Pathfinding,B1 Engineer,B1,ai,Intelligent Test Data Generation
+Pathfinding,B1 Engineer,B1,ai,ML Basics for Testers
+Pathfinding,B1 Engineer,B1,core,API Automation
+Pathfinding,B1 Engineer,B1,core,Cloud Test Execution
+Pathfinding,B1 Engineer,B1,core,Intermediate Automation
+Pathfinding,B1 Engineer,B1,core,Performance Testing
+Pathfinding,B1 Engineer,B1,core,Test Data Management
+Pathfinding,B1 Engineer,B1,softskills,Estimation & Planning
+Pathfinding,B1 Engineer,B1,softskills,Structured Communication
+Pathfinding,B1 Engineer,B1,softskills,� Client-Facing Professionalism
+Pathfinding,B1 Engineer,B1,softskills,� Giving Feedback
+Pathfinding,B1 Engineer,B1,softskills,� �Conflict-Free Communication
+Pathfinding,B1 Engineer,B1,softskills,� �Prioritization
+Specialist,B2 Specialist,B2,ai,AI-Enhanced Framework Design
+Specialist,B2 Specialist,B2,ai,GenAI Pipeline Integration
+Specialist,B2 Specialist,B2,ai,ML-Based Test Prioritization
+Specialist,B2 Specialist,B2,core,Advanced Programming
+Specialist,B2 Specialist,B2,core,API Mastery
+Specialist,B2 Specialist,B2,core,Framework Design
+Specialist,B2 Specialist,B2,core,Performance Foundations
+Specialist,B2 Specialist,B2,softskills,Coaching & Mentoring
+Specialist,B2 Specialist,B2,softskills,� Assertive Communication
+Specialist,B2 Specialist,B2,softskills,� Facilitating Agile Ceremonies
+Specialist,B2 Specialist,B2,softskills,� Handling Difficult Conversations
+Specialist,B2 Specialist,B2,softskills,� Influencing Without Authority
+Specialist,B2 Specialist,B2,softskills,� Leading Work Packages
+Specialist,C1 Senior Specialist,C1,ai,AI Performance Engineering
+Specialist,C1 Senior Specialist,C1,ai,AI-Native Automation Patterns
+Specialist,C1 Senior Specialist,C1,ai,AIOps
+Specialist,C1 Senior Specialist,C1,core,Advanced Performance
+Specialist,C1 Senior Specialist,C1,core,Cloud-Native Automation
+Specialist,C1 Senior Specialist,C1,core,Security Testing
+Specialist,C1 Senior Specialist,C1,core,TestOps
+Specialist,C1 Senior Specialist,C1,softskills,Delegation
+Specialist,C1 Senior Specialist,C1,softskills,Emotional Intelligence
+Specialist,C1 Senior Specialist,C1,softskills,Team Leadership & Motivation
+Specialist,C1 Senior Specialist,C1,softskills,� Mediation
+Specialist,C1 Senior Specialist,C1,softskills,� Running Effective Meetings
+Specialist,C1 Senior Specialist,C1,softskills,� Stakeholder Management
+Specialist,C2 Principal Specialist,C2,ai,AI Quality Analytics
+Specialist,C2 Principal Specialist,C2,ai,AI Tooling Strategy
+Specialist,C2 Principal Specialist,C2,ai,AI-Enhanced TestOps Pipelines
+Specialist,C2 Principal Specialist,C2,core,Engineering Analytics
+Specialist,C2 Principal Specialist,C2,core,Enterprise Automation Architecture
+Specialist,C2 Principal Specialist,C2,core,Tooling Strategy
+Specialist,C2 Principal Specialist,C2,softskills,Change Management Fundamentals
+Specialist,C2 Principal Specialist,C2,softskills,Cross-Team Communication
+Specialist,C2 Principal Specialist,C2,softskills,Managing Up
+Specialist,C2 Principal Specialist,C2|D1,softskills,Negotiation
+Specialist,C2 Principal Specialist,C2,softskills,Strategic Thinking
+Specialist,C2 Principal Specialist,C2,softskills,� Coaching for Performance
 Specialist,D1 Architect,D1,ai,AI-First Architecture Patterns
 Specialist,D1 Architect,D1,ai,Autonomous Testing Foundations
-Specialist,D1 Architect,D1,ai,Intelligent CI/CD Ecosystems
-Specialist,D1 Architect,D1,core,CI/CD & IaC Architecture
-Specialist,D1 Architect,D1,core,Enterprise Test Architecture
-Specialist,D1 Architect,D1,core,Scalable Automation Platforms
-Specialist,D1 Architect,D1,core,Solution Design Governance
-Specialist,D1 Architect,D1,softskills,Architecture Mentorship
-Specialist,D1 Architect,D1,softskills,Cross-Domain Leadership
-Specialist,D1 Architect,D1,softskills,Decision Governance
-Specialist,D1 Architect,D1,softskills,Stakeholder Alignment
-Specialist,D1 Architect,D1,softskills,Strategic Communication
-Specialist,D1 Architect,D1,softskills,Technical Roadmapping
-Specialist,D2 Senior Architect,D2,ai,AI-Driven Automation Ecosystems
-Specialist,D2 Senior Architect,D2,ai,Emerging AI Platform Strategy
+Specialist,D1 Architect,D1,ai,Intelligent CI/CD
+Specialist,D1 Architect,D1,core,CI/CD Architecture
+Specialist,D1 Architect,D1,core,IaC
+Specialist,D1 Architect,D1,core,Intelligent Automation
+Specialist,D1 Architect,D1,core,Test Architecture Patterns
+Specialist,D1 Architect,D1,softskills,Building High-Performance Teams
+Specialist,D1 Architect,D1|D2,softskills,Executive Communication
+Specialist,D1 Architect,D1,softskills,High-Stakes Negotiation
+Specialist,D1 Architect,D1,softskills,Leading Through Change
+Specialist,D1 Architect,D1,softskills,Organizational Leadership
+Specialist,D1 Architect,D1,softskills,Strategic Influence
+Specialist,D2 Senior Architect,D2,ai,AI-Driven Automation Platforms
+Specialist,D2 Senior Architect,D2,ai,Emerging AI Trends
 Specialist,D2 Senior Architect,D2,ai,Strategic AI Roadmapping
-Specialist,D2 Senior Architect,D2,core,Digital Transformation Architecture
-Specialist,D2 Senior Architect,D2,core,Enterprise Solution Governance
-Specialist,D2 Senior Architect,D2,core,Global Architecture Standards
-Specialist,D2 Senior Architect,D2,core,Platform Scalability Strategy
-Specialist,D2 Senior Architect,D2,softskills,Board-Level Communication
-Specialist,D2 Senior Architect,D2,softskills,Capability Uplift Leadership
-Specialist,D2 Senior Architect,D2,softskills,Enterprise Influence
-Specialist,D2 Senior Architect,D2,softskills,Executive Presence
-Specialist,D2 Senior Architect,D2,softskills,Industry Thought Leadership
+Specialist,D2 Senior Architect,D2,core,Emerging Trends
+Specialist,D2 Senior Architect,D2,core,Scalable Platforms
+Specialist,D2 Senior Architect,D2,core,Tech Roadmapping
+Specialist,D2 Senior Architect,D2,softskills,Innovation Leadership
+Specialist,D2 Senior Architect,D2,softskills,Thought Leadership
 Specialist,D2 Senior Architect,D2,softskills,Vision & Storytelling
-Executive,D3 Director,D3,ai,AI Portfolio Strategy
-Executive,D3 Director,D3,ai,AI-Driven Market Expansion
-Executive,D3 Director,D3,ai,AI-Enabled Service Innovation
-Executive,D3 Director,D3,core,Business Unit Strategy
-Executive,D3 Director,D3,core,Capability Scaling
-Executive,D3 Director,D3,core,Commercial Growth Management
-Executive,D3 Director,D3,core,Operational Risk & KPI Governance
-Executive,D3 Director,D3,softskills,Culture Building
-Executive,D3 Director,D3,softskills,Enterprise Leadership
-Executive,D3 Director,D1|D3,softskills,Executive Communication
-Executive,D3 Director,D3,softskills,Performance Governance
-Executive,D3 Director,D3,softskills,Strategic Negotiation
-Executive,D3 Director,D3,softskills,Talent Sponsorship
-Executive,E1 Senior Director,E1,ai,AI Market Positioning
-Executive,E1 Senior Director,E1,ai,AI Service Proposition Leadership
-Executive,E1 Senior Director,E1,ai,Enterprise AI Transformation Strategy
-Executive,E1 Senior Director,E1,core,Cross-Business Strategy Execution
-Executive,E1 Senior Director,E1,core,Market & Proposition Leadership
-Executive,E1 Senior Director,E1,core,Portfolio Transformation Governance
-Executive,E1 Senior Director,E1,softskills,Board-Level Influence
-Executive,E1 Senior Director,E1,softskills,Cultural Stewardship
-Executive,E1 Senior Director,E1,softskills,Enterprise Alignment
-Executive,E1 Senior Director,E1,softskills,Leadership Pipeline Sponsorship
-Executive,E1 Senior Director,E1,softskills,Organizational Design Leadership
-Executive,E1 Senior Director,E1,softskills,Strategic Partnerships
-Executive,E2 Senior Executive,E2,ai,AI Enterprise Visioning
-Executive,E2 Senior Executive,E2,ai,AI Investment & Innovation Strategy
-Executive,E2 Senior Executive,E2,ai,AI-Driven Business Reinvention
-Executive,E2 Senior Executive,E2,core,Enterprise Vision & Corporate Strategy
-Executive,E2 Senior Executive,E2,core,Global Operating Model Leadership
-Executive,E2 Senior Executive,E2,core,M&A & Investment Governance
-Executive,E2 Senior Executive,E2,softskills,Enterprise Culture Shaping
-Executive,E2 Senior Executive,E2,softskills,Ethical Governance
-Executive,E2 Senior Executive,E2,softskills,Executive Diplomacy
-Executive,E2 Senior Executive,E2,softskills,Global Strategic Influence
-Executive,E2 Senior Executive,E2,softskills,Investor & Regulator Communication
-Executive,E2 Senior Executive,E2,softskills,Visionary Leadership
+Specialist,D2 Senior Architect,D2,softskills,� Crisis Communication
+Specialist,D2 Senior Architect,D2,softskills,� Enterprise Stakeholder Management
+Specialist,D2 Senior Architect,D2,softskills,� Executive Presence
