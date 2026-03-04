@@ -1,0 +1,80 @@
+Implement end-to-end CLI pipeline for keyword-to-course mapping
+Add command-line flag parsing for scraper runtime options
+Support default application configuration for tenant URL, filters, and output paths
+Add path resolution helpers for runtime file locations
+Implement structured logger with info, warn, error, and debug levels
+Implement persistent authenticated browser session bootstrap
+Support profile-based session reuse for Udemy SSO continuity
+Harden browser session lifecycle management and closed-session recovery
+Enforce single-tab navigation by closing popups and extra pages
+Implement keyword normalization prerequisite check with freshness detection
+Add normalized keyword generation when source CSV is newer or missing
+Implement normalized keyword CSV loading with schema validation
+Support level code parsing from normalized keyword rows
+Add module type validation for normalized keyword input rows
+Implement source keyword CSV parsing with header alias normalization
+Support BOM and whitespace-tolerant source CSV headers
+Add delimiter fallback between semicolon and comma source files
+Implement track carry-forward for rows with empty track cells
+Support comma-splitting and whitespace cleanup for module keyword cells
+Add case-insensitive keyword deduplication during normalization
+Implement per-keyword framework level code union across rows
+Support deterministic sorting of normalized keyword rows
+Export normalized keywords to CSV with level code serialization
+Implement dedicated CLI entrypoint for keyword normalization only
+Implement search URL builder with rating, language, duration, and sort filters
+Support repeated instructional level query parameters in search URLs
+Support repeated duration query parameters in search URLs
+Implement paginated URL construction helpers for multiple paging styles
+Implement throttled navigation wrapper with jitter and bounded retries
+Harden navigation against login redirects and unauthenticated states
+Detect 403/429 responses and trigger retry backoff policy
+Export navigation failure artifacts as screenshot, HTML, and diagnostics text
+Implement search endpoint candidate detection from network responses
+Support heuristics to exclude non-result API endpoints
+Add response predicates for matching page-specific search payloads
+Implement API payload shape checks for search result extraction
+Support search result URL summarization for debug logging
+Implement search result HTML parsing for course link extraction
+Normalize and deduplicate extracted course detail URLs from search HTML
+Implement keyword-level URL collection with load-more pagination
+Support early pagination stop when no new course URLs appear
+Export empty-search debug HTML artifacts for investigation
+Implement canonical URL normalization by stripping query and hash
+Reject malformed, non-course, and cross-host URLs during canonicalization
+Implement detail page extraction from runtime payload and JSON-LD
+Support canonical URL fallback from og:url and discovered URL
+Implement course duration parsing from total length text patterns
+Support minutes-only and hours-only duration parsing edge cases
+Harden detail extraction with diagnostic payload when course data is missing
+Implement blocked keyword policy with case-insensitive normalized matching
+Add extensive disallowed title keyword list for business filtering policy
+Apply blocked keyword filtering in search extraction and detail gates
+Implement eligibility filtering by minimum rating and rating count thresholds
+Add explicit rejection reason codes for filtered-out courses
+Implement career level parsing from framework level labels
+Support static mapping from career levels to instructional levels
+Implement instructional-level target mapping for ranking fitness
+Implement course scoring by level fit, rating quality, and popularity
+Reject scoring candidates outside allowed instructional level set
+Implement ranked course deduplication by canonical URL
+Support deterministic ranking order across score, rating, and popularity ties
+Build export rows with validated track, metrics, and instructional level
+Implement incremental top courses CSV writer with stable append order
+Support CSV escaping for commas, quotes, and multiline fields
+Implement append-only all courses audit writer with schema headers
+Support all courses header migration fallback to v2 output file
+Add per-row UTC timestamp stamping for all courses audit records
+Support per-run deduplication mode for all courses audit writes
+Implement serialized write queues to prevent concurrent CSV interleaving
+Export accepted shortlist to top courses artifact per run
+Export inspected, accepted, and rejected outcomes to all courses artifact
+Log per-keyword processing lifecycle and filtering decisions
+Harden per-keyword isolation so failures do not abort full runs
+Document technical runtime behavior, CLI options, and artifact contracts
+Document business-facing workflow and usage guidance for non-technical teams
+Document traceable functional requirements for implemented behavior
+Document architecture decisions for filtering, determinism, and reliability
+Add smoke command and typecheck command for developer workflows
+Implement automated unit test suite for normalization, filtering, scoring, and writers
+Add package scripts for scraping, normalization, testing, and build automation
